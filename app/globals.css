@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: corporate --default;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
