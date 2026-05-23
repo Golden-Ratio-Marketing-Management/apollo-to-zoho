@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { IBM_Plex_Sans } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -15,7 +19,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="corporate"
-      className="h-full antialiased"
+      className={cn("h-full antialiased", "font-sans", ibmPlexSans.variable)}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
