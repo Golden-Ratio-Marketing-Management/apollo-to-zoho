@@ -6,27 +6,28 @@ import "./globals.css"
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
-  variable: "--font-sans",
+  variable: "--font-sans"
 })
 
 export const metadata: Metadata = {
   title: "Apollo to Zoho",
   description: "Import Apollo.io contacts into Zoho CRM",
+  robots: {
+    index: false,
+    follow: false
+  }
 }
 
 export default function RootLayout({
-  children,
+  children
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      className={cn("h-full antialiased", "font-sans", ibmPlexSans.variable)}
-    >
+    <html lang="en" className={cn("h-full antialiased", "font-sans", ibmPlexSans.variable)}>
       <body className="flex min-h-full flex-col">
         {children}
-        <Toaster />
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   )
