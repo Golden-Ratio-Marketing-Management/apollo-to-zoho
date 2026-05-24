@@ -1,7 +1,7 @@
-import { pgTable, uuid, text } from "drizzle-orm/pg-core";
+import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core"
 
-export const apolloAccounts = pgTable("apolloAccounts", {
-  id: uuid("id").defaultRandom().notNull().primaryKey(),
+export const apolloAccounts = sqliteTable("apolloAccounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   account: text("account").notNull(),
-  encryptedKey: text("encrypted_key").notNull(),
-});
+  encryptedKey: text("encrypted_key").notNull()
+})

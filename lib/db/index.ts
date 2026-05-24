@@ -1,11 +1,14 @@
-import { drizzle } from "drizzle-orm/postgres-js"
-import postgres from "postgres"
+import { drizzle } from "drizzle-orm/libsql"
 
-const connectionString = process.env.DATABASE_URL
+const url = process.env.DATABASE_URL
+const authToken = process.env.DATABASE_AUTH_TOKEN
 
-if (!connectionString) {
+if (!url) {
   throw new Error("DATABASE_URL is not set in the environment variables")
 }
 
-const client = postgres(connectionString, { prepare: false })
-export const db = drizzle(client)
+if (!authToken) {
+  throw new Error("DATABASE_URL is not set in the environment variables")
+}
+
+export const db = drizzle({ connection: { url, authToken } })
