@@ -32,10 +32,12 @@ import {
 
 type ApolloAccountsManagerProps = {
   initialAccounts: ApolloAccountPublic[]
+  compact?: boolean
 }
 
 export function ApolloAccountsManager({
   initialAccounts,
+  compact = false,
 }: ApolloAccountsManagerProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [accountName, setAccountName] = useState("")
@@ -85,24 +87,29 @@ export function ApolloAccountsManager({
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <SiteHeader />
+    <div className={compact ? "flex flex-col gap-6" : "flex flex-col gap-6 p-6"}>
+      {!compact && <SiteHeader role="admin" />}
 
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Apollo API keys
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Add or remove Apollo accounts stored in the database. API keys are
-          encrypted at rest and are never shown after saving.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Internal tool only — do not share access, credentials, or this URL.{" "}
-          <Link href="/" className="text-primary underline-offset-4 hover:underline">
-            Back to importer
-          </Link>
-        </p>
-      </div>
+      {!compact && (
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Apollo API keys
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Add or remove Apollo accounts stored in the database. API keys are
+            encrypted at rest and are never shown after saving.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Internal tool only — do not share access, credentials, or this URL.{" "}
+            <Link
+              href="/importer"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Back to importer
+            </Link>
+          </p>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

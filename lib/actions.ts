@@ -1,14 +1,16 @@
 "use server"
 
 import { eq } from "drizzle-orm"
-import { decrypt } from "@/lib/crypto"
+import { decrypt, encrypt } from "@/lib/crypto"
 import { normalizeApolloContact } from "@/lib/contacts"
+import { requireAdmin, requireUser } from "@/lib/auth"
+import { writeAuditLog } from "@/lib/audit"
 import {
   APOLLO_CONTACT_MODALITY,
   MAX_ZOHO_BATCH,
 } from "@/lib/constants"
 import { db } from "@/lib/db"
-import { apolloAccounts } from "@/lib/db/schema"
+import { apolloAccounts, zohoSecrets } from "@/lib/db/schema"
 import type {
   ActionResult,
   ApolloContactRaw,
@@ -16,12 +18,8 @@ import type {
   ContactsPage,
   SelectOption,
   ZohoCampaignPicklistResponse,
-  ZohoGrantResult,
   ZohoItem,
 } from "@/lib/types"
-
-let zohoAccessToken: string | null = null
-let expiresAt = 0
 
 function apolloHeaders(apiKey: string) {
   return {
@@ -55,6 +53,8 @@ async function getApolloApiKey(
 export async function fetchApolloAccounts(): Promise<
   ActionResult<SelectOption[]>
 > {
+  await requireUser()
+
   try {
     const rows = await db
       .select({
@@ -78,6 +78,8 @@ export async function fetchApolloAccounts(): Promise<
 export async function fetchApolloLists(
   accountId: string,
 ): Promise<ActionResult<SelectOption[]>> {
+  await requireUser()
+
   try {
     const keyResult = await getApolloApiKey(accountId)
     if (!keyResult.ok) return keyResult
@@ -113,6 +115,8 @@ export async function fetchApolloContacts(
   page: number,
   perPage: number,
 ): Promise<ActionResult<ContactsPage>> {
+  await requireUser()
+
   try {
     const keyResult = await getApolloApiKey(accountId)
     if (!keyResult.ok) return keyResult
@@ -159,52 +163,29 @@ export async function fetchApolloContacts(
   }
 }
 
-export async function fetchZohoTokensUsingGrantToken(grantToken:string) {
-  try {
-    const formData = new FormData();
-
-    formData.append("client_id", process.env.ZOHO_CLIENT_ID!);
-    formData.append("client_secret", process.env.ZOHO_CLIENT_SECRET!);
-    formData.append("redirect_uri", process.env.BASE_URL!);
-    formData.append("code", grantToken);
-    formData.append("grant_type", "authorization_code");
-
-    const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
-      method: "POST",
-      body: formData,
-      cache: "no-cache",
-    })
-
-    const data = await res.json()
-
-    if (!res.ok) {
-      return { ok: false, error: "Failed to fetch Zoho access token using grant token" }
-    }
-
-    const result:ZohoGrantResult = data
-
-    const accessToken = result.access_token
-    const refreshToken = result.refresh_token
-    const scope = result.scope
-
-    return { ok: true, data: { accessToken, refreshToken, expiresAt, scope } }
-  } catch {
-    return { ok: false, error: "Failed to fetch Zoho access token using grant token" }
-  }
-}
-
 export async function fetchZohoToken(): Promise<ActionResult<string>> {
+  await requireUser()
+
   try {
     const now = Date.now()
+    const [secret] = await db.select().from(zohoSecrets).limit(1)
 
-    if (zohoAccessToken && now < expiresAt) {
-      return { ok: true, data: zohoAccessToken }
+    if (!secret) {
+      return { ok: false, error: "Zoho credentials are not configured" }
     }
 
+    if (secret.accessTokenExpiresAt.getTime() > now + 60_000) {
+      return { ok: true, data: decrypt(secret.encryptedAccessToken) }
+    }
+
+    const clientId = decrypt(secret.encryptedClientId)
+    const clientSecret = decrypt(secret.encryptedClientSecret)
+    const refreshToken = decrypt(secret.encryptedRefreshToken)
+
     const params = new URLSearchParams({
-      refresh_token: process.env.ZOHO_REFRESH_TOKEN!,
-      client_id: process.env.ZOHO_CLIENT_ID!,
-      client_secret: process.env.ZOHO_CLIENT_SECRET!,
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: "refresh_token",
     })
 
@@ -221,8 +202,16 @@ export async function fetchZohoToken(): Promise<ActionResult<string>> {
     }
 
     const accessToken = data.access_token as string
-    zohoAccessToken = accessToken
-    expiresAt = now + (data.expires_in - 60) * 1000
+    const accessTokenExpiresAt = new Date(now + (data.expires_in - 60) * 1000)
+
+    await db
+      .update(zohoSecrets)
+      .set({
+        encryptedAccessToken: encryptAccessToken(accessToken),
+        accessTokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(zohoSecrets.id, secret.id))
 
     return { ok: true, data: accessToken }
   } catch {
@@ -231,6 +220,8 @@ export async function fetchZohoToken(): Promise<ActionResult<string>> {
 }
 
 export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
+  await requireUser()
+
   try {
     const tokenResult = await fetchZohoToken()
     if (!tokenResult.ok) return tokenResult
@@ -286,6 +277,8 @@ async function pushZohoBatch(
 export async function pushToZoho(
   contacts: ZohoItem[],
 ): Promise<ActionResult<{ pushed: number }>> {
+  const actor = await requireUser()
+
   try {
     if (contacts.length === 0) {
       return { ok: false, error: "No contacts selected to push" }
@@ -300,8 +293,139 @@ export async function pushToZoho(
       if (!result.ok) return result
     }
 
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "zoho.push_contacts",
+      targetType: "zoho",
+      metadata: { count: contacts.length },
+    })
+
     return { ok: true, data: { pushed: contacts.length } }
   } catch {
     return { ok: false, error: "Failed to push contacts to Zoho" }
   }
+}
+
+export async function configureZohoSecrets(
+  clientId: string,
+  clientSecret: string,
+  grantToken: string,
+): Promise<ActionResult<void>> {
+  const actor = await requireAdmin()
+  const trimmedClientId = clientId.trim()
+  const trimmedClientSecret = clientSecret.trim()
+  const trimmedGrantToken = grantToken.trim()
+
+  if (!trimmedClientId || !trimmedClientSecret || !trimmedGrantToken) {
+    return { ok: false, error: "All Zoho fields are required" }
+  }
+
+  try {
+    const tokenResult = await fetchZohoTokensUsingGrantToken(
+      trimmedClientId,
+      trimmedClientSecret,
+      trimmedGrantToken,
+    )
+
+    if (!tokenResult.ok) return tokenResult
+
+    const now = new Date()
+    const [existing] = await db.select({ id: zohoSecrets.id }).from(zohoSecrets).limit(1)
+    const values = {
+      encryptedClientId: encryptAccessToken(trimmedClientId),
+      encryptedClientSecret: encryptAccessToken(trimmedClientSecret),
+      encryptedRefreshToken: encryptAccessToken(tokenResult.data.refreshToken),
+      encryptedAccessToken: encryptAccessToken(tokenResult.data.accessToken),
+      accessTokenExpiresAt: tokenResult.data.accessTokenExpiresAt,
+      configuredById: actor.id,
+      updatedAt: now,
+    }
+
+    if (existing) {
+      await db.update(zohoSecrets).set(values).where(eq(zohoSecrets.id, existing.id))
+    } else {
+      await db.insert(zohoSecrets).values({ ...values, createdAt: now })
+    }
+
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "zoho.configure",
+      targetType: "zoho",
+    })
+
+    return { ok: true, data: undefined }
+  } catch {
+    return { ok: false, error: "Failed to configure Zoho credentials" }
+  }
+}
+
+export async function fetchZohoTokensUsingGrantToken(
+  clientId: string,
+  clientSecret: string,
+  grantToken: string,
+): Promise<
+  ActionResult<{
+    accessToken: string
+    refreshToken: string
+    accessTokenExpiresAt: Date
+  }>
+> {
+  await requireAdmin()
+
+  try {
+    const now = Date.now()
+    const params = new URLSearchParams({
+      code: grantToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code",
+    })
+
+    const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
+      method: "POST",
+      body: params,
+      cache: "no-cache",
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.access_token || !data.refresh_token) {
+      return { ok: false, error: "Failed to exchange Zoho grant token" }
+    }
+
+    return {
+      ok: true,
+      data: {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        accessTokenExpiresAt: new Date(now + (data.expires_in - 60) * 1000),
+      },
+    }
+  } catch {
+    return { ok: false, error: "Failed to exchange Zoho grant token" }
+  }
+}
+
+export async function getZohoConfigurationStatus(): Promise<
+  ActionResult<{ configured: boolean; updatedAt: Date | null }>
+> {
+  await requireAdmin()
+
+  try {
+    const [secret] = await db
+      .select({ updatedAt: zohoSecrets.updatedAt })
+      .from(zohoSecrets)
+      .limit(1)
+
+    return {
+      ok: true,
+      data: { configured: Boolean(secret), updatedAt: secret?.updatedAt ?? null },
+    }
+  } catch {
+    return { ok: false, error: "Failed to load Zoho configuration status" }
+  }
+}
+
+function encryptAccessToken(value: string) {
+  return encrypt(value)
 }

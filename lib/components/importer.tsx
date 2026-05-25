@@ -26,11 +26,12 @@ import type { NormalizedContact, SelectOption } from "@/lib/types"
 
 type ImporterProps = {
   accounts: SelectOption[]
+  userRole?: "admin" | "user"
 }
 
 type AsyncStatus = "idle" | "loading" | "success" | "error"
 
-export function Importer({ accounts }: ImporterProps) {
+export function Importer({ accounts, userRole }: ImporterProps) {
   const [, startTransition] = useTransition()
 
   const [accountId, setAccountId] = useState("")
@@ -86,10 +87,10 @@ export function Importer({ accounts }: ImporterProps) {
   }, [])
 
   const loadLists = useCallback((nextAccountId: string) => {
-    setListsStatus("loading")
-    setListsError(null)
-
     startTransition(async () => {
+      setListsStatus("loading")
+      setListsError(null)
+
       const result = await fetchApolloLists(nextAccountId)
 
       if (!result.ok) {
@@ -111,10 +112,10 @@ export function Importer({ accounts }: ImporterProps) {
       nextPage: number,
       nextPerPage: number,
     ) => {
-      setContactsStatus("loading")
-      setContactsError(null)
-
       startTransition(async () => {
+        setContactsStatus("loading")
+        setContactsError(null)
+
         const result = await fetchApolloContacts(
           nextAccountId,
           nextListId,
@@ -140,10 +141,10 @@ export function Importer({ accounts }: ImporterProps) {
   )
 
   useEffect(() => {
-    setCampaignsStatus("loading")
-    setCampaignsError(null)
-
     startTransition(async () => {
+      setCampaignsStatus("loading")
+      setCampaignsError(null)
+
       const result = await fetchCampaigns()
 
       if (!result.ok) {
@@ -159,14 +160,7 @@ export function Importer({ accounts }: ImporterProps) {
   }, [])
 
   useEffect(() => {
-    if (!accountId) {
-      setLists([])
-      setListsStatus("idle")
-      setListsError(null)
-      return
-    }
-
-    loadLists(accountId)
+    if (accountId) loadLists(accountId)
   }, [accountId, loadLists])
 
   useEffect(() => {
@@ -259,7 +253,7 @@ export function Importer({ accounts }: ImporterProps) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <SiteHeader />
+      <SiteHeader role={userRole} />
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">

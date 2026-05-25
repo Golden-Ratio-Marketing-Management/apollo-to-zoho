@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
 import { encrypt } from "@/lib/crypto"
+import { requireAdmin } from "@/lib/auth"
+import { writeAuditLog } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { apolloAccounts } from "@/lib/db/schema"
 import type { ActionResult } from "@/lib/types"
@@ -15,6 +17,8 @@ export type ApolloAccountPublic = {
 export async function listApolloAccountsAdmin(): Promise<
   ActionResult<ApolloAccountPublic[]>
 > {
+  await requireAdmin()
+
   try {
     const rows = await db
       .select({
@@ -33,6 +37,7 @@ export async function addApolloAccount(
   account: string,
   apiKey: string,
 ): Promise<ActionResult<ApolloAccountPublic>> {
+  const actor = await requireAdmin()
   const name = account.trim()
   const key = apiKey.trim()
 
@@ -60,14 +65,23 @@ export async function addApolloAccount(
       .values({
         account: name,
         encryptedKey: encrypt(key),
+        adminId: actor.id,
       })
       .returning({
         id: apolloAccounts.id,
         account: apolloAccounts.account,
       })
 
-    revalidatePath("/")
-    revalidatePath("/api")
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "apollo_account.create",
+      targetType: "apollo_account",
+      targetId: row.id,
+      metadata: { account: name },
+    })
+
+    revalidatePath("/importer")
+    revalidatePath("/admin")
 
     return { ok: true, data: row }
   } catch {
@@ -78,6 +92,8 @@ export async function addApolloAccount(
 export async function removeApolloAccount(
   id: string,
 ): Promise<ActionResult<void>> {
+  const actor = await requireAdmin()
+
   if (!id.trim()) {
     return { ok: false, error: "Account id is required" }
   }
@@ -92,8 +108,15 @@ export async function removeApolloAccount(
       return { ok: false, error: "Account not found" }
     }
 
-    revalidatePath("/")
-    revalidatePath("/api")
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "apollo_account.remove",
+      targetType: "apollo_account",
+      targetId: id,
+    })
+
+    revalidatePath("/importer")
+    revalidatePath("/admin")
 
     return { ok: true, data: undefined }
   } catch {
