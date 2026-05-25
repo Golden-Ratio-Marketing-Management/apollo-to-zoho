@@ -16,6 +16,7 @@ import type {
   ContactsPage,
   SelectOption,
   ZohoCampaignPicklistResponse,
+  ZohoGrantResult,
   ZohoItem,
 } from "@/lib/types"
 
@@ -155,6 +156,40 @@ export async function fetchApolloContacts(
     }
   } catch {
     return { ok: false, error: "Failed to load contacts" }
+  }
+}
+
+export async function fetchZohoTokensUsingGrantToken(grantToken:string) {
+  try {
+    const formData = new FormData();
+
+    formData.append("client_id", process.env.ZOHO_CLIENT_ID!);
+    formData.append("client_secret", process.env.ZOHO_CLIENT_SECRET!);
+    formData.append("redirect_uri", process.env.BASE_URL!);
+    formData.append("code", grantToken);
+    formData.append("grant_type", "authorization_code");
+
+    const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
+      method: "POST",
+      body: formData,
+      cache: "no-cache",
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return { ok: false, error: "Failed to fetch Zoho access token using grant token" }
+    }
+
+    const result:ZohoGrantResult = data
+
+    const accessToken = result.access_token
+    const refreshToken = result.refresh_token
+    const scope = result.scope
+
+    return { ok: true, data: { accessToken, refreshToken, expiresAt, scope } }
+  } catch {
+    return { ok: false, error: "Failed to fetch Zoho access token using grant token" }
   }
 }
 
