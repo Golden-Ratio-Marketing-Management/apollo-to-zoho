@@ -285,6 +285,7 @@ export function Importer({ accounts, userRole }: ImporterProps) {
           value={listId}
           onValueChange={handleListChange}
           disabled={!accountId || listsStatus === "loading"}
+          loading={listsStatus === "loading"}
         />
         <OptionSelect
           label="Client campaign"
@@ -339,9 +340,9 @@ export function Importer({ accounts, userRole }: ImporterProps) {
         <section className="flex flex-col gap-4">
           {contactsStatus === "loading" && (
             <div className="flex flex-col gap-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Spinner />
                 Loading contacts…
