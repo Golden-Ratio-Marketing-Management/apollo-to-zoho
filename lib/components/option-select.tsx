@@ -19,6 +19,7 @@ type OptionSelectProps = {
   value: string
   onValueChange: (value: string) => void
   disabled?: boolean
+  loading?:boolean
   className?: string
   layout?: "stacked" | "inline"
   triggerClassName?: string
@@ -40,6 +41,7 @@ export function OptionSelect({
   className,
   layout = "stacked",
   triggerClassName,
+  loading=false
 }: OptionSelectProps) {
   const items = normalizeOptions(options)
   const selectItems = items.map((option) => ({
@@ -54,15 +56,17 @@ export function OptionSelect({
       onValueChange={(next) => {
         if (next) onValueChange(next)
       }}
-      disabled={disabled}
     >
       <SelectTrigger
         className={cn(
           layout === "inline" ? "w-[4.5rem]" : "w-full",
           triggerClassName,
         )}
+      disabled={disabled}
+
       >
-        <SelectValue placeholder={placeholder} />
+        {!loading && <SelectValue placeholder={placeholder} />}
+        {loading && "Loading..."}
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>

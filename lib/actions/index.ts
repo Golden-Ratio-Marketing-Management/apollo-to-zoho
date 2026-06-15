@@ -1,0 +1,418 @@
+"use server"
+
+import { eq } from "drizzle-orm"
+import { decrypt, encrypt } from "@/lib/crypto"
+import { normalizeApolloContact } from "@/lib/contacts"
+import { requireAdmin, requireUser } from "@/lib/auth"
+import { writeAuditLog } from "@/lib/audit"
+import { APOLLO_CONTACT_MODALITY, MAX_ZOHO_BATCH } from "@/lib/constants"
+import { db } from "@/lib/db"
+import { apolloAccounts, zohoSecrets } from "@/lib/db/schema"
+import type {
+  ActionResult,
+  ApolloContactRaw,
+  ApolloLabel,
+  ContactsPage,
+  SelectOption,
+  ZohoCampaignPicklistResponse,
+  ZohoItem
+} from "@/lib/types"
+
+function apolloHeaders(apiKey: string) {
+  return {
+    "Cache-Control": "no-cache",
+    "Content-Type": "application/json",
+    accept: "application/json",
+    "x-api-key": apiKey
+  }
+}
+
+async function getApolloApiKey(accountId: string): Promise<ActionResult<string>> {
+  try {
+    const rows = await db
+      .select({ encryptedKey: apolloAccounts.encryptedKey })
+      .from(apolloAccounts)
+      .where(eq(apolloAccounts.id, accountId))
+      .limit(1)
+
+    if (!rows[0]) {
+      return { ok: false, error: "Apollo account not found" }
+    }
+
+    return { ok: true, data: decrypt(rows[0].encryptedKey) }
+  } catch {
+    return { ok: false, error: "Failed to load Apollo account credentials" }
+  }
+}
+
+export async function fetchApolloAccounts(): Promise<ActionResult<SelectOption[]>> {
+  await requireUser()
+
+  try {
+    const rows = await db
+      .select({
+        id: apolloAccounts.id,
+        account: apolloAccounts.account
+      })
+      .from(apolloAccounts)
+
+    return {
+      ok: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        label: row.account
+      }))
+    }
+  } catch {
+    return { ok: false, error: "Failed to load Apollo accounts" }
+  }
+}
+
+export async function fetchApolloLists(accountId: string): Promise<ActionResult<SelectOption[]>> {
+  await requireUser()
+
+  try {
+    const keyResult = await getApolloApiKey(accountId)
+    if (!keyResult.ok) return keyResult
+
+    const res = await fetch(`${process.env.APOLLO_API_URL}/labels`, {
+      headers: apolloHeaders(keyResult.data),
+      cache: "no-cache"
+    })
+
+    if (!res.ok) {
+      return { ok: false, error: "Failed to load Apollo lists" }
+    }
+
+    const labels = (await res.json()) as ApolloLabel[]
+
+    return {
+      ok: true,
+      data: labels
+        .filter((label) => label.modality === APOLLO_CONTACT_MODALITY)
+        .map((label) => ({
+          id: label.id,
+          label: label.name
+        }))
+    }
+  } catch {
+    return { ok: false, error: "Failed to load Apollo lists" }
+  }
+}
+
+export async function fetchApolloContacts(
+  accountId: string,
+  listId: string,
+  page: number,
+  perPage: number
+): Promise<ActionResult<ContactsPage>> {
+  await requireUser()
+
+  try {
+    const keyResult = await getApolloApiKey(accountId)
+    if (!keyResult.ok) return keyResult
+
+    const res = await fetch(`${process.env.APOLLO_API_URL}/contacts/search`, {
+      method: "POST",
+      headers: apolloHeaders(keyResult.data),
+      cache: "no-cache",
+      body: JSON.stringify({
+        contact_label_ids: [listId],
+        page,
+        per_page: perPage
+      })
+    })
+
+    if (!res.ok) {
+      return { ok: false, error: "Failed to load contacts" }
+    }
+
+    const data = (await res.json()) as {
+      contacts: ApolloContactRaw[]
+      pagination: {
+        page: number
+        per_page: number
+        total_entries: number
+        total_pages: number
+      }
+    }
+
+    return {
+      ok: true,
+      data: {
+        contacts: (data.contacts ?? []).map(normalizeApolloContact),
+        pagination: {
+          page: data.pagination.page,
+          perPage: data.pagination.per_page,
+          totalEntries: data.pagination.total_entries,
+          totalPages: data.pagination.total_pages
+        }
+      }
+    }
+  } catch (e) {
+    console.error(e)
+    return { ok: false, error: "Failed to load contacts" }
+  }
+}
+
+export async function fetchZohoToken(): Promise<ActionResult<string>> {
+  await requireUser()
+
+  try {
+    const now = Date.now()
+    const [secret] = await db.select().from(zohoSecrets).limit(1)
+
+    if (!secret) {
+      return { ok: false, error: "Zoho credentials are not configured" }
+    }
+
+    if (secret.accessTokenExpiresAt.getTime() > now + 60_000) {
+      return { ok: true, data: decrypt(secret.encryptedAccessToken) }
+    }
+
+    const clientId = decrypt(secret.encryptedClientId)
+    const clientSecret = decrypt(secret.encryptedClientSecret)
+    const refreshToken = decrypt(secret.encryptedRefreshToken)
+
+    const params = new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token"
+    })
+
+    const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
+      method: "POST",
+      body: params,
+      cache: "no-cache"
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return { ok: false, error: "Failed to fetch Zoho access token" }
+    }
+
+    const accessToken = data.access_token as string
+    const accessTokenExpiresAt = new Date(now + (data.expires_in - 60) * 1000)
+
+    await db
+      .update(zohoSecrets)
+      .set({
+        encryptedAccessToken: encryptAccessToken(accessToken),
+        accessTokenExpiresAt,
+        updatedAt: new Date()
+      })
+      .where(eq(zohoSecrets.id, secret.id))
+
+    return { ok: true, data: accessToken }
+  } catch {
+    return { ok: false, error: "Failed to fetch Zoho access token" }
+  }
+}
+
+export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
+  await requireUser()
+
+  try {
+    const tokenResult = await fetchZohoToken()
+    if (!tokenResult.ok) return tokenResult
+
+    const res = await fetch(
+      `${process.env.ZOHO_API_URL}/settings/global_picklists/6968892000004029154`,
+      {
+        headers: {
+          Authorization: `Zoho-oauthtoken ${tokenResult.data}`
+        },
+        cache: "no-cache"
+      }
+    )
+
+    if (!res.ok) {
+      return { ok: false, error: "Failed to fetch campaigns" }
+    }
+
+    const data = (await res.json()) as ZohoCampaignPicklistResponse
+
+    return {
+      ok: true,
+      data: data.global_picklists[0].pick_list_values
+        .filter((value) => value.type === "used")
+        .map((value) => value.display_value)
+    }
+  } catch {
+    return { ok: false, error: "Failed to fetch campaigns" }
+  }
+}
+
+async function pushZohoBatch(accessToken: string, contacts: ZohoItem[]): Promise<ActionResult> {
+  const res = await fetch(`${process.env.ZOHO_API_URL}/Leads/upsert`, {
+    method: "POST",
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ data: contacts }),
+    cache: "no-cache"
+  })
+
+  if (!res.ok) {
+    return { ok: false, error: "Failed to push contacts to Zoho" }
+  }
+
+  return { ok: true, data: undefined }
+}
+
+export async function pushToZoho(contacts: ZohoItem[]): Promise<ActionResult<{ pushed: number }>> {
+  const actor = await requireUser()
+
+  try {
+    if (contacts.length === 0) {
+      return { ok: false, error: "No contacts selected to push" }
+    }
+
+    const tokenResult = await fetchZohoToken()
+    if (!tokenResult.ok) return tokenResult
+
+    for (let index = 0; index < contacts.length; index += MAX_ZOHO_BATCH) {
+      const batch = contacts.slice(index, index + MAX_ZOHO_BATCH)
+      const result = await pushZohoBatch(tokenResult.data, batch)
+      if (!result.ok) return result
+    }
+
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "zoho.push_contacts",
+      targetType: "zoho",
+      metadata: { count: contacts.length }
+    })
+
+    return { ok: true, data: { pushed: contacts.length } }
+  } catch {
+    return { ok: false, error: "Failed to push contacts to Zoho" }
+  }
+}
+
+export async function configureZohoSecrets(
+  clientId: string,
+  clientSecret: string,
+  grantToken: string
+): Promise<ActionResult<void>> {
+  const actor = await requireAdmin()
+  const trimmedClientId = clientId.trim()
+  const trimmedClientSecret = clientSecret.trim()
+  const trimmedGrantToken = grantToken.trim()
+
+  if (!trimmedClientId || !trimmedClientSecret || !trimmedGrantToken) {
+    return { ok: false, error: "All Zoho fields are required" }
+  }
+
+  try {
+    const tokenResult = await fetchZohoTokensUsingGrantToken(
+      trimmedClientId,
+      trimmedClientSecret,
+      trimmedGrantToken
+    )
+
+    if (!tokenResult.ok) return tokenResult
+
+    const now = new Date()
+    const [existing] = await db.select({ id: zohoSecrets.id }).from(zohoSecrets).limit(1)
+    const values = {
+      encryptedClientId: encryptAccessToken(trimmedClientId),
+      encryptedClientSecret: encryptAccessToken(trimmedClientSecret),
+      encryptedRefreshToken: encryptAccessToken(tokenResult.data.refreshToken),
+      encryptedAccessToken: encryptAccessToken(tokenResult.data.accessToken),
+      accessTokenExpiresAt: tokenResult.data.accessTokenExpiresAt,
+      configuredById: actor.id,
+      updatedAt: now
+    }
+
+    if (existing) {
+      await db.update(zohoSecrets).set(values).where(eq(zohoSecrets.id, existing.id))
+    } else {
+      await db.insert(zohoSecrets).values({ ...values, createdAt: now })
+    }
+
+    await writeAuditLog({
+      actorId: actor.id,
+      action: "zoho.configure",
+      targetType: "zoho"
+    })
+
+    return { ok: true, data: undefined }
+  } catch {
+    return { ok: false, error: "Failed to configure Zoho credentials" }
+  }
+}
+
+export async function fetchZohoTokensUsingGrantToken(
+  clientId: string,
+  clientSecret: string,
+  grantToken: string
+): Promise<
+  ActionResult<{
+    accessToken: string
+    refreshToken: string
+    accessTokenExpiresAt: Date
+  }>
+> {
+  await requireAdmin()
+
+  try {
+    const now = Date.now()
+    const params = new URLSearchParams({
+      code: grantToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "authorization_code"
+    })
+
+    const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
+      method: "POST",
+      body: params,
+      cache: "no-cache"
+    })
+
+    const data = await res.json()
+
+    if (!res.ok || !data.access_token || !data.refresh_token) {
+      return { ok: false, error: "Failed to exchange Zoho grant token" }
+    }
+
+    return {
+      ok: true,
+      data: {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        accessTokenExpiresAt: new Date(now + (data.expires_in - 60) * 1000)
+      }
+    }
+  } catch {
+    return { ok: false, error: "Failed to exchange Zoho grant token" }
+  }
+}
+
+export async function getZohoConfigurationStatus(): Promise<
+  ActionResult<{ configured: boolean; updatedAt: Date | null }>
+> {
+  await requireAdmin()
+
+  try {
+    const [secret] = await db
+      .select({ updatedAt: zohoSecrets.updatedAt })
+      .from(zohoSecrets)
+      .limit(1)
+
+    return {
+      ok: true,
+      data: { configured: Boolean(secret), updatedAt: secret?.updatedAt ?? null }
+    }
+  } catch {
+    return { ok: false, error: "Failed to load Zoho configuration status" }
+  }
+}
+
+function encryptAccessToken(value: string) {
+  return encrypt(value)
+}

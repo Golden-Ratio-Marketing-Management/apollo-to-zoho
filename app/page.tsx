@@ -1,36 +1,22 @@
-import { Importer } from "@/lib/components/importer"
-import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
-import { fetchApolloAccounts } from "@/lib/actions"
+import { redirect } from "next/navigation"
+import { AuthForms } from "@/lib/components/auth-forms"
+import { getCurrentUser } from "@/lib/auth"
+import { hasAnyAdmin } from "@/lib/actions/auth"
 
 export const dynamic = "force-dynamic"
 
 export default async function Home() {
-  const accountsResult = await fetchApolloAccounts()
+  const user = await getCurrentUser()
 
-  if (!accountsResult.ok) {
-    throw new Error(accountsResult.error)
+  if (user) {
+    redirect(user.role === "admin" ? "/admin" : "/importer")
   }
 
-  if (accountsResult.data.length === 0) {
-    return (
-      <main className="flex flex-col gap-6 p-6">
-        <Alert>
-          <AlertTitle>No Apollo accounts configured</AlertTitle>
-          <AlertDescription>
-            Add at least one Apollo account on the{" "}
-            <a href="/api" className="text-primary underline-offset-4 hover:underline">
-              API keys
-            </a>{" "}
-            page before importing contacts.
-          </AlertDescription>
-        </Alert>
-      </main>
-    )
-  }
+  const hasAdmin = await hasAnyAdmin()
 
   return (
     <main>
-      <Importer accounts={accountsResult.data} />
+      <AuthForms bootstrapOpen={!hasAdmin} />
     </main>
   )
 }

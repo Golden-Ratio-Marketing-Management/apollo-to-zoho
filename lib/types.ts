@@ -60,9 +60,7 @@ export interface SelectOption {
   label: string
 }
 
-export type ActionResult<T = void> =
-  | { ok: true; data: T }
-  | { ok: false; error: string }
+export type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string }
 
 export interface ApolloLabel {
   id: string
@@ -122,4 +120,13 @@ export interface ContactsPage {
     totalEntries: number
     totalPages: number
   }
+}
+
+export interface ZohoGrantResult {
+  access_token: string
+  refresh_token: string
+  scope: string
+  api_domain: string
+  token_type: string
+  expires_in: 3600
 }

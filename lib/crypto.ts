@@ -1,31 +1,47 @@
 import crypto from "node:crypto"
 
-const algorithm = "aes-256-cbc"
+const algorithm = "aes-256-gcm"
 const secretKey = process.env.SECRET_KEY
 
 if (!secretKey) {
-  console.error("SECRET_KEY environment variable is required")
-  throw new Error("Server configuration error")
+  throw new Error("SECRET_KEY environment variable is required")
 }
 
-const key = crypto.createHash("sha512").update(secretKey).digest("hex").substring(0, 32)
-
-const iv = crypto.randomBytes(16)
+const key = crypto.createHash("sha256").update(secretKey).digest()
 
 export function encrypt(data: string) {
-  const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv)
-  let encrypted = cipher.update(data, "utf-8", "hex")
-  encrypted += cipher.final("hex")
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv(algorithm, key, iv)
+  const encrypted = Buffer.concat([
+    cipher.update(data, "utf8"),
+    cipher.final(),
+  ])
+  const authTag = cipher.getAuthTag()
 
-  return iv.toString("hex") + encrypted
+  return [
+    "gcm",
+    iv.toString("base64url"),
+    authTag.toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(":")
 }
 
 export function decrypt(data: string) {
-  const inputIV = data.slice(0, 32)
-  const encrypted = data.slice(32)
-  const decipher = crypto.createDecipheriv(algorithm, Buffer.from(key), Buffer.from(inputIV, "hex"))
+  const [version, iv, authTag, encrypted] = data.split(":")
 
-  let decrypted = decipher.update(encrypted, "hex", "utf-8")
-  decrypted += decipher.final("utf-8")
-  return decrypted
+  if (version !== "gcm" || !iv || !authTag || !encrypted) {
+    throw new Error("Unsupported encrypted payload")
+  }
+
+  const decipher = crypto.createDecipheriv(
+    algorithm,
+    key,
+    Buffer.from(iv, "base64url"),
+  )
+  decipher.setAuthTag(Buffer.from(authTag, "base64url"))
+
+  return Buffer.concat([
+    decipher.update(Buffer.from(encrypted, "base64url")),
+    decipher.final(),
+  ]).toString("utf8")
 }
