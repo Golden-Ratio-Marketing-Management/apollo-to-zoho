@@ -33,10 +33,7 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
   const email = contact.email?.trim() ?? ""
   const phones = extractPhoneNumbers(contact)
 
-  const displayName =
-    contact.name?.trim() ||
-    [firstName, lastName].filter(Boolean).join(" ") ||
-    "—"
+  const displayName = contact.name?.trim() || [firstName, lastName].filter(Boolean).join(" ") || "—"
 
   return {
     id: contact.id,
@@ -46,37 +43,28 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
     email,
     title: contact.title?.trim() || undefined,
     linkedinUrl: contact.linkedin_url?.trim() || undefined,
-    sanitizedPhone: phones[0],
+    sanitizedPhone: contact.sanitized_phone || undefined,
     alternatePhone: phones[1],
     organizationName:
-      contact.organization_name?.trim() ||
-      contact.organization?.name?.trim() ||
-      undefined,
+      contact.organization_name?.trim() || contact.organization?.name?.trim() || undefined,
     organizationWebsite: contact.organization?.website_url?.trim() || undefined,
     organizationLinkedin: contact.organization?.linkedin_url?.trim() || undefined,
-    personalEmail: extractPersonalEmail(contact),
+    personalEmail: extractPersonalEmail(contact)
   }
 }
 
 export function isQualifyingContact(contact: NormalizedContact): boolean {
-  return Boolean(
-    contact.firstName.trim() &&
-      contact.lastName.trim() &&
-      contact.email.trim(),
-  )
+  return Boolean(contact.firstName.trim() && contact.lastName.trim() && contact.email.trim())
 }
 
-export function contactToZohoItem(
-  contact: NormalizedContact,
-  campaign: string,
-): ZohoItem {
+export function contactToZohoItem(contact: NormalizedContact, campaign: string): ZohoItem {
   const item: ZohoItem = {
     First_Name: contact.firstName,
     Last_Name: contact.lastName,
     Lead_Source: "Apollo.io",
     Lead_Status: "Not Contacted",
     Client_Campaign: campaign,
-    Email: contact.email,
+    Email: contact.email
   }
 
   if (contact.personalEmail) item.Personal_Email = contact.personalEmail

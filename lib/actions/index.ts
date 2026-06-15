@@ -5,10 +5,7 @@ import { decrypt, encrypt } from "@/lib/crypto"
 import { normalizeApolloContact } from "@/lib/contacts"
 import { requireAdmin, requireUser } from "@/lib/auth"
 import { writeAuditLog } from "@/lib/audit"
-import {
-  APOLLO_CONTACT_MODALITY,
-  MAX_ZOHO_BATCH,
-} from "@/lib/constants"
+import { APOLLO_CONTACT_MODALITY, MAX_ZOHO_BATCH } from "@/lib/constants"
 import { db } from "@/lib/db"
 import { apolloAccounts, zohoSecrets } from "@/lib/db/schema"
 import type {
@@ -18,7 +15,7 @@ import type {
   ContactsPage,
   SelectOption,
   ZohoCampaignPicklistResponse,
-  ZohoItem,
+  ZohoItem
 } from "@/lib/types"
 
 function apolloHeaders(apiKey: string) {
@@ -26,13 +23,11 @@ function apolloHeaders(apiKey: string) {
     "Cache-Control": "no-cache",
     "Content-Type": "application/json",
     accept: "application/json",
-    "x-api-key": apiKey,
+    "x-api-key": apiKey
   }
 }
 
-async function getApolloApiKey(
-  accountId: string,
-): Promise<ActionResult<string>> {
+async function getApolloApiKey(accountId: string): Promise<ActionResult<string>> {
   try {
     const rows = await db
       .select({ encryptedKey: apolloAccounts.encryptedKey })
@@ -50,16 +45,14 @@ async function getApolloApiKey(
   }
 }
 
-export async function fetchApolloAccounts(): Promise<
-  ActionResult<SelectOption[]>
-> {
+export async function fetchApolloAccounts(): Promise<ActionResult<SelectOption[]>> {
   await requireUser()
 
   try {
     const rows = await db
       .select({
         id: apolloAccounts.id,
-        account: apolloAccounts.account,
+        account: apolloAccounts.account
       })
       .from(apolloAccounts)
 
@@ -67,17 +60,15 @@ export async function fetchApolloAccounts(): Promise<
       ok: true,
       data: rows.map((row) => ({
         id: row.id,
-        label: row.account,
-      })),
+        label: row.account
+      }))
     }
   } catch {
     return { ok: false, error: "Failed to load Apollo accounts" }
   }
 }
 
-export async function fetchApolloLists(
-  accountId: string,
-): Promise<ActionResult<SelectOption[]>> {
+export async function fetchApolloLists(accountId: string): Promise<ActionResult<SelectOption[]>> {
   await requireUser()
 
   try {
@@ -86,7 +77,7 @@ export async function fetchApolloLists(
 
     const res = await fetch(`${process.env.APOLLO_API_URL}/labels`, {
       headers: apolloHeaders(keyResult.data),
-      cache: "no-cache",
+      cache: "no-cache"
     })
 
     if (!res.ok) {
@@ -101,8 +92,8 @@ export async function fetchApolloLists(
         .filter((label) => label.modality === APOLLO_CONTACT_MODALITY)
         .map((label) => ({
           id: label.id,
-          label: label.name,
-        })),
+          label: label.name
+        }))
     }
   } catch {
     return { ok: false, error: "Failed to load Apollo lists" }
@@ -113,7 +104,7 @@ export async function fetchApolloContacts(
   accountId: string,
   listId: string,
   page: number,
-  perPage: number,
+  perPage: number
 ): Promise<ActionResult<ContactsPage>> {
   await requireUser()
 
@@ -128,8 +119,8 @@ export async function fetchApolloContacts(
       body: JSON.stringify({
         contact_label_ids: [listId],
         page,
-        per_page: perPage,
-      }),
+        per_page: perPage
+      })
     })
 
     if (!res.ok) {
@@ -154,11 +145,12 @@ export async function fetchApolloContacts(
           page: data.pagination.page,
           perPage: data.pagination.per_page,
           totalEntries: data.pagination.total_entries,
-          totalPages: data.pagination.total_pages,
-        },
-      },
+          totalPages: data.pagination.total_pages
+        }
+      }
     }
-  } catch {
+  } catch (e) {
+    console.error(e)
     return { ok: false, error: "Failed to load contacts" }
   }
 }
@@ -186,13 +178,13 @@ export async function fetchZohoToken(): Promise<ActionResult<string>> {
       refresh_token: refreshToken,
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: "refresh_token",
+      grant_type: "refresh_token"
     })
 
     const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
       method: "POST",
       body: params,
-      cache: "no-cache",
+      cache: "no-cache"
     })
 
     const data = await res.json()
@@ -209,7 +201,7 @@ export async function fetchZohoToken(): Promise<ActionResult<string>> {
       .set({
         encryptedAccessToken: encryptAccessToken(accessToken),
         accessTokenExpiresAt,
-        updatedAt: new Date(),
+        updatedAt: new Date()
       })
       .where(eq(zohoSecrets.id, secret.id))
 
@@ -230,10 +222,10 @@ export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
       `${process.env.ZOHO_API_URL}/settings/global_picklists/6968892000004029154`,
       {
         headers: {
-          Authorization: `Zoho-oauthtoken ${tokenResult.data}`,
+          Authorization: `Zoho-oauthtoken ${tokenResult.data}`
         },
-        cache: "no-cache",
-      },
+        cache: "no-cache"
+      }
     )
 
     if (!res.ok) {
@@ -246,25 +238,22 @@ export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
       ok: true,
       data: data.global_picklists[0].pick_list_values
         .filter((value) => value.type === "used")
-        .map((value) => value.display_value),
+        .map((value) => value.display_value)
     }
   } catch {
     return { ok: false, error: "Failed to fetch campaigns" }
   }
 }
 
-async function pushZohoBatch(
-  accessToken: string,
-  contacts: ZohoItem[],
-): Promise<ActionResult> {
+async function pushZohoBatch(accessToken: string, contacts: ZohoItem[]): Promise<ActionResult> {
   const res = await fetch(`${process.env.ZOHO_API_URL}/Leads/upsert`, {
     method: "POST",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({ data: contacts }),
-    cache: "no-cache",
+    cache: "no-cache"
   })
 
   if (!res.ok) {
@@ -274,9 +263,7 @@ async function pushZohoBatch(
   return { ok: true, data: undefined }
 }
 
-export async function pushToZoho(
-  contacts: ZohoItem[],
-): Promise<ActionResult<{ pushed: number }>> {
+export async function pushToZoho(contacts: ZohoItem[]): Promise<ActionResult<{ pushed: number }>> {
   const actor = await requireUser()
 
   try {
@@ -297,7 +284,7 @@ export async function pushToZoho(
       actorId: actor.id,
       action: "zoho.push_contacts",
       targetType: "zoho",
-      metadata: { count: contacts.length },
+      metadata: { count: contacts.length }
     })
 
     return { ok: true, data: { pushed: contacts.length } }
@@ -309,7 +296,7 @@ export async function pushToZoho(
 export async function configureZohoSecrets(
   clientId: string,
   clientSecret: string,
-  grantToken: string,
+  grantToken: string
 ): Promise<ActionResult<void>> {
   const actor = await requireAdmin()
   const trimmedClientId = clientId.trim()
@@ -324,7 +311,7 @@ export async function configureZohoSecrets(
     const tokenResult = await fetchZohoTokensUsingGrantToken(
       trimmedClientId,
       trimmedClientSecret,
-      trimmedGrantToken,
+      trimmedGrantToken
     )
 
     if (!tokenResult.ok) return tokenResult
@@ -338,7 +325,7 @@ export async function configureZohoSecrets(
       encryptedAccessToken: encryptAccessToken(tokenResult.data.accessToken),
       accessTokenExpiresAt: tokenResult.data.accessTokenExpiresAt,
       configuredById: actor.id,
-      updatedAt: now,
+      updatedAt: now
     }
 
     if (existing) {
@@ -350,7 +337,7 @@ export async function configureZohoSecrets(
     await writeAuditLog({
       actorId: actor.id,
       action: "zoho.configure",
-      targetType: "zoho",
+      targetType: "zoho"
     })
 
     return { ok: true, data: undefined }
@@ -362,7 +349,7 @@ export async function configureZohoSecrets(
 export async function fetchZohoTokensUsingGrantToken(
   clientId: string,
   clientSecret: string,
-  grantToken: string,
+  grantToken: string
 ): Promise<
   ActionResult<{
     accessToken: string
@@ -378,13 +365,13 @@ export async function fetchZohoTokensUsingGrantToken(
       code: grantToken,
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: "authorization_code",
+      grant_type: "authorization_code"
     })
 
     const res = await fetch(`${process.env.ZOHO_OAUTH_URL}/token`, {
       method: "POST",
       body: params,
-      cache: "no-cache",
+      cache: "no-cache"
     })
 
     const data = await res.json()
@@ -398,8 +385,8 @@ export async function fetchZohoTokensUsingGrantToken(
       data: {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
-        accessTokenExpiresAt: new Date(now + (data.expires_in - 60) * 1000),
-      },
+        accessTokenExpiresAt: new Date(now + (data.expires_in - 60) * 1000)
+      }
     }
   } catch {
     return { ok: false, error: "Failed to exchange Zoho grant token" }
@@ -419,7 +406,7 @@ export async function getZohoConfigurationStatus(): Promise<
 
     return {
       ok: true,
-      data: { configured: Boolean(secret), updatedAt: secret?.updatedAt ?? null },
+      data: { configured: Boolean(secret), updatedAt: secret?.updatedAt ?? null }
     }
   } catch {
     return { ok: false, error: "Failed to load Zoho configuration status" }

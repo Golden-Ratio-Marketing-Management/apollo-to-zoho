@@ -1,17 +1,26 @@
 import { redirect } from "next/navigation"
 import { Importer } from "@/lib/components/importer"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
-import { fetchApolloAccounts } from "@/lib/actions"
+import { fetchApolloAccounts, fetchCampaigns } from "@/lib/actions"
 import { signOut } from "@/lib/actions/auth"
 import { requireUser } from "@/lib/auth"
 import { Button } from "@/lib/components/ui/button"
 
+export const dynamic = "force-dynamic"
+
 export default async function ImporterPage() {
   const user = await requireUser()
-  const accountsResult = await fetchApolloAccounts()
+  const [accountsResult, campaignsResult] = await Promise.all([
+    fetchApolloAccounts(),
+    fetchCampaigns()
+  ])
 
   if (!accountsResult.ok) {
     throw new Error(accountsResult.error)
+  }
+
+  if (!campaignsResult.ok) {
+    throw new Error(campaignsResult.error)
   }
 
   async function onRedirect() {
@@ -53,7 +62,11 @@ export default async function ImporterPage() {
 
   return (
     <main>
-      <Importer accounts={accountsResult.data} userRole={user.role} />
+      <Importer
+        accounts={accountsResult.data}
+        campaigns={campaignsResult.data}
+        userRole={user.role}
+      />
     </main>
   )
 }

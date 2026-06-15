@@ -9,13 +9,7 @@ import { ApolloAccountsManager } from "@/lib/components/apollo-accounts-manager"
 import { SiteHeader } from "@/lib/components/site-header"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
 import { Button } from "@/lib/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/lib/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card"
 import { Input } from "@/lib/components/ui/input"
 import { Label } from "@/lib/components/ui/label"
 import {
@@ -24,7 +18,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from "@/lib/components/ui/select"
 import {
   Table,
@@ -32,7 +26,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "@/lib/components/ui/table"
 import type { CurrentUser } from "@/lib/auth"
 import type { ApolloAccountPublic } from "@/lib/actions/apollo-accounts"
@@ -56,7 +50,7 @@ export function AdminDashboard({
   currentUser,
   initialAccounts,
   initialUsers,
-  zohoStatus,
+  zohoStatus
 }: AdminDashboardProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -64,7 +58,7 @@ export function AdminDashboard({
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Manage service credentials and user access for the importer.
         </p>
       </div>
@@ -77,7 +71,7 @@ export function AdminDashboard({
 }
 
 function ZohoSecretsCard({
-  initialStatus,
+  initialStatus
 }: {
   initialStatus: { configured: boolean; updatedAt: Date | null }
 }) {
@@ -95,7 +89,7 @@ function ZohoSecretsCard({
       const result = await configureZohoSecrets(
         String(formData.get("clientId") ?? ""),
         String(formData.get("clientSecret") ?? ""),
-        String(formData.get("grantToken") ?? ""),
+        String(formData.get("grantToken") ?? "")
       )
 
       if (!result.ok) {
@@ -149,7 +143,7 @@ function ZohoSecretsCard({
 
 function UsersCard({
   currentUserId,
-  initialUsers,
+  initialUsers
 }: {
   currentUserId: string
   initialUsers: AdminUser[]
@@ -170,7 +164,7 @@ function UsersCard({
         String(formData.get("name") ?? ""),
         String(formData.get("email") ?? ""),
         String(formData.get("password") ?? ""),
-        role,
+        role
       )
 
       if (!result.ok) {
@@ -196,9 +190,7 @@ function UsersCard({
       }
 
       setUsers((current) =>
-        current.map((user) =>
-          user.id === id ? { ...user, revokedAt: new Date() } : user,
-        ),
+        current.map((user) => (user.id === id ? { ...user, revokedAt: new Date() } : user))
       )
       toast.success("User revoked")
     })
@@ -221,7 +213,7 @@ function UsersCard({
               value={role}
               items={[
                 { value: "user", label: "User" },
-                { value: "admin", label: "Admin" },
+                { value: "admin", label: "Admin" }
               ]}
               onValueChange={(value) => {
                 if (value === "admin" || value === "user") setRole(value)
@@ -266,7 +258,7 @@ function UsersCard({
                 <TableCell>{user.role}</TableCell>
                 <TableCell className="text-right">
                   {user.revokedAt ? (
-                    <span className="text-sm text-muted-foreground">Revoked</span>
+                    <span className="text-muted-foreground text-sm">Revoked</span>
                   ) : (
                     <Button
                       type="button"
@@ -291,7 +283,7 @@ function UsersCard({
 function SecretField({
   id,
   label,
-  type = "password",
+  type = "password"
 }: {
   id: string
   label: string
