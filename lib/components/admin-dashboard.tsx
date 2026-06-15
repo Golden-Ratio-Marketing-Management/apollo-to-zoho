@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2Icon } from "lucide-react"
 import { configureZohoSecrets } from "@/lib/actions"
@@ -77,31 +77,32 @@ function ZohoSecretsCard({
 }) {
   const [status, setStatus] = useState(initialStatus)
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const formData = new FormData(form)
     setError(null)
+    setLoading(true)
 
-    startTransition(async () => {
-      const result = await configureZohoSecrets(
-        String(formData.get("clientId") ?? ""),
-        String(formData.get("clientSecret") ?? ""),
-        String(formData.get("grantToken") ?? "")
-      )
+    const result = await configureZohoSecrets(
+      String(formData.get("clientId") ?? ""),
+      String(formData.get("clientSecret") ?? ""),
+      String(formData.get("grantToken") ?? "")
+    )
 
-      if (!result.ok) {
-        setError(result.error)
-        toast.error(result.error)
-        return
-      }
+    setLoading(false)
 
-      form.reset()
-      setStatus({ configured: true, updatedAt: new Date() })
-      toast.success("Zoho credentials configured")
-    })
+    if (!result.ok) {
+      setError(result.error)
+      toast.error(result.error)
+      return
+    }
+
+    form.reset()
+    setStatus({ configured: true, updatedAt: new Date() })
+    toast.success("Zoho credentials configured")
   }
 
   return (
@@ -125,8 +126,8 @@ function ZohoSecretsCard({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button disabled={isPending} type="submit" className="w-fit">
-            {isPending ? (
+          <Button disabled={loading} type="submit" className="w-fit">
+            {loading ? (
               <>
                 <Loader2Icon data-icon="inline-start" className="animate-spin" />
                 Saving...
@@ -151,49 +152,48 @@ function UsersCard({
   const [users, setUsers] = useState(initialUsers)
   const [role, setRole] = useState<"admin" | "user">("user")
   const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(false)
 
-  const handleCreate = (event: React.FormEvent<HTMLFormElement>) => {
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const formData = new FormData(form)
     setError(null)
+    setLoading(true)
 
-    startTransition(async () => {
-      const result = await createUser(
-        String(formData.get("name") ?? ""),
-        String(formData.get("email") ?? ""),
-        String(formData.get("password") ?? ""),
-        role
-      )
+    const result = await createUser(
+      String(formData.get("name") ?? ""),
+      String(formData.get("email") ?? ""),
+      String(formData.get("password") ?? ""),
+      role
+    )
 
-      if (!result.ok) {
-        setError(result.error)
-        toast.error(result.error)
-        return
-      }
+    setLoading(false)
 
-      form.reset()
-      setRole("user")
-      setUsers((current) => [...current, { ...result.data, revokedAt: null }])
-      toast.success(`Created ${result.data.email}`)
-    })
+    if (!result.ok) {
+      setError(result.error)
+      toast.error(result.error)
+      return
+    }
+
+    form.reset()
+    setRole("user")
+    setUsers((current) => [...current, { ...result.data, revokedAt: null }])
+    toast.success(`Created ${result.data.email}`)
   }
 
-  const handleRevoke = (id: string) => {
-    startTransition(async () => {
-      const result = await revokeUser(id)
+  async function handleRevoke(id: string) {
+    const result = await revokeUser(id)
 
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
 
-      setUsers((current) =>
-        current.map((user) => (user.id === id ? { ...user, revokedAt: new Date() } : user))
-      )
-      toast.success("User revoked")
-    })
+    setUsers((current) =>
+      current.map((user) => (user.id === id ? { ...user, revokedAt: new Date() } : user))
+    )
+    toast.success("User revoked")
   }
 
   return (
@@ -236,7 +236,7 @@ function UsersCard({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Button disabled={isPending} type="submit" className="w-fit">
+          <Button disabled={loading} type="submit" className="w-fit">
             Create user
           </Button>
         </form>
@@ -264,7 +264,7 @@ function UsersCard({
                       type="button"
                       size="sm"
                       variant="destructive"
-                      disabled={isPending || user.id === currentUserId}
+                      disabled={loading || user.id === currentUserId}
                       onClick={() => handleRevoke(user.id)}
                     >
                       Revoke

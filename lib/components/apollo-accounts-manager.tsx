@@ -1,24 +1,18 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Loader2Icon, Trash2Icon } from "lucide-react"
 import {
   addApolloAccount,
   removeApolloAccount,
-  type ApolloAccountPublic,
+  type ApolloAccountPublic
 } from "@/lib/actions/apollo-accounts"
 import { SiteHeader } from "@/lib/components/site-header"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
 import { Button } from "@/lib/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/lib/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card"
 import { Input } from "@/lib/components/ui/input"
 import { Label } from "@/lib/components/ui/label"
 import {
@@ -27,7 +21,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "@/lib/components/ui/table"
 
 type ApolloAccountsManagerProps = {
@@ -37,53 +31,54 @@ type ApolloAccountsManagerProps = {
 
 export function ApolloAccountsManager({
   initialAccounts,
-  compact = false,
+  compact = false
 }: ApolloAccountsManagerProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [accountName, setAccountName] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [formError, setFormError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+  const [loading, setLoading] = useState(false)
 
-  const handleAdd = (event: React.FormEvent) => {
+  async function handleAdd(event: React.FormEvent) {
     event.preventDefault()
     setFormError(null)
+    setLoading(true)
 
-    startTransition(async () => {
-      const result = await addApolloAccount(accountName, apiKey)
+    const result = await addApolloAccount(accountName, apiKey)
 
-      if (!result.ok) {
-        setFormError(result.error)
-        toast.error(result.error)
-        return
-      }
+    setLoading(false)
 
-      setAccounts((current) => [...current, result.data])
-      setAccountName("")
-      setApiKey("")
-      toast.success(`Added account “${result.data.account}”`)
-    })
+    if (!result.ok) {
+      setFormError(result.error)
+      toast.error(result.error)
+      return
+    }
+
+    setAccounts((current) => [...current, result.data])
+    setAccountName("")
+    setApiKey("")
+    toast.success(`Added account “${result.data.account}”`)
   }
 
-  const handleRemove = (account: ApolloAccountPublic) => {
+  async function handleRemove(account: ApolloAccountPublic) {
     const confirmed = window.confirm(
-      `Remove “${account.account}”? The API key will be deleted from the database.`,
+      `Remove “${account.account}”? The API key will be deleted from the database.`
     )
     if (!confirmed) return
 
-    startTransition(async () => {
-      const result = await removeApolloAccount(account.id)
+    setLoading(true)
 
-      if (!result.ok) {
-        toast.error(result.error)
-        return
-      }
+    const result = await removeApolloAccount(account.id)
 
-      setAccounts((current) =>
-        current.filter((row) => row.id !== account.id),
-      )
-      toast.success(`Removed account “${account.account}”`)
-    })
+    setLoading(false)
+
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+
+    setAccounts((current) => current.filter((row) => row.id !== account.id))
+    toast.success(`Removed account “${account.account}”`)
   }
 
   return (
@@ -92,19 +87,14 @@ export function ApolloAccountsManager({
 
       {!compact && (
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Apollo API keys
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Add or remove Apollo accounts stored in the database. API keys are
-            encrypted at rest and are never shown after saving.
+          <h1 className="text-2xl font-semibold tracking-tight">Apollo API keys</h1>
+          <p className="text-muted-foreground text-sm">
+            Add or remove Apollo accounts stored in the database. API keys are encrypted at rest and
+            are never shown after saving.
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Internal tool only — do not share access, credentials, or this URL.{" "}
-            <Link
-              href="/importer"
-              className="text-primary underline-offset-4 hover:underline"
-            >
+            <Link href="/importer" className="text-primary underline-offset-4 hover:underline">
               Back to importer
             </Link>
           </p>
@@ -115,15 +105,11 @@ export function ApolloAccountsManager({
         <CardHeader>
           <CardTitle>Add account</CardTitle>
           <CardDescription>
-            Enter a display name and the Apollo API key. The key is only used on
-            the server.
+            Enter a display name and the Apollo API key. The key is only used on the server.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={handleAdd}
-            className="flex flex-col gap-4 sm:max-w-md"
-          >
+          <form onSubmit={handleAdd} className="flex flex-col gap-4 sm:max-w-md">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="account-name">Account name</Label>
               <Input
@@ -131,7 +117,7 @@ export function ApolloAccountsManager({
                 value={accountName}
                 onChange={(event) => setAccountName(event.target.value)}
                 placeholder="e.g. Sales team"
-                disabled={isPending}
+                disabled={loading}
                 autoComplete="off"
               />
             </div>
@@ -143,7 +129,7 @@ export function ApolloAccountsManager({
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
                 placeholder="Paste Apollo API key"
-                disabled={isPending}
+                disabled={loading}
                 autoComplete="new-password"
               />
             </div>
@@ -153,8 +139,8 @@ export function ApolloAccountsManager({
                 <AlertDescription>{formError}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" disabled={isPending} className="w-fit">
-              {isPending ? (
+            <Button type="submit" disabled={loading} className="w-fit">
+              {loading ? (
                 <>
                   <Loader2Icon data-icon="inline-start" className="animate-spin" />
                   Saving…
@@ -178,7 +164,7 @@ export function ApolloAccountsManager({
         </CardHeader>
         <CardContent>
           {accounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Add an account above to use the importer.
             </p>
           ) : (
@@ -198,7 +184,7 @@ export function ApolloAccountsManager({
                         type="button"
                         variant="destructive"
                         size="sm"
-                        disabled={isPending}
+                        disabled={loading}
                         onClick={() => handleRemove(account)}
                       >
                         <Trash2Icon data-icon="inline-start" />
