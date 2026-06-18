@@ -15,7 +15,6 @@ import { Spinner } from "@/lib/components/ui/spinner"
 import { Skeleton } from "@/lib/components/ui/skeleton"
 import { CONTACTS_PER_PAGE_OPTIONS, DEFAULT_CONTACTS_PER_PAGE } from "@/lib/constants"
 import type { NormalizedContact, SelectOption } from "@/lib/types"
-import { Input } from "./ui/input"
 
 type ImporterProps = {
   accounts: SelectOption[]
