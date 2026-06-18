@@ -54,17 +54,24 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
 }
 
 export function isQualifyingContact(contact: NormalizedContact): boolean {
-  return Boolean(contact.firstName.trim() && contact.lastName.trim() && contact.email.trim())
+  return Boolean(contact.firstName.trim() && contact.lastName.trim())
 }
 
-export function contactToZohoItem(contact: NormalizedContact, campaign: string): ZohoItem {
+export function contactToZohoItem(
+  contact: NormalizedContact,
+  campaign: string,
+  email: string
+): ZohoItem {
   const item: ZohoItem = {
     First_Name: contact.firstName,
     Last_Name: contact.lastName,
     Lead_Source: "Apollo.io",
     Lead_Status: "Not Contacted",
     Client_Campaign: campaign,
-    Email: contact.email
+    Email: contact.email,
+    Owner: {
+      email
+    }
   }
 
   if (contact.personalEmail) item.Personal_Email = contact.personalEmail

@@ -7,7 +7,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from "@/lib/components/ui/table"
 import { isQualifyingContact } from "@/lib/contacts"
 import type { NormalizedContact } from "@/lib/types"
@@ -23,18 +23,15 @@ export function ContactsTable({
   contacts,
   checkedIds,
   onCheckedChange,
-  onToggleAllQualifying,
+  onToggleAllQualifying
 }: ContactsTableProps) {
   const qualifying = contacts.filter(isQualifyingContact)
   const qualifyingIds = qualifying.map((contact) => contact.id)
-  const selectedQualifyingCount = qualifyingIds.filter((id) =>
-    checkedIds.has(id),
-  ).length
+  const selectedQualifyingCount = qualifyingIds.filter((id) => checkedIds.has(id)).length
 
   const allQualifyingChecked =
     qualifying.length > 0 && selectedQualifyingCount === qualifying.length
-  const someQualifyingChecked =
-    selectedQualifyingCount > 0 && !allQualifyingChecked
+  const someQualifyingChecked = selectedQualifyingCount > 0 && !allQualifyingChecked
 
   return (
     <Table>
@@ -45,14 +42,13 @@ export function ContactsTable({
               checked={allQualifyingChecked}
               indeterminate={someQualifyingChecked}
               disabled={qualifying.length === 0}
-              onCheckedChange={(checked) =>
-                onToggleAllQualifying(checked === true)
-              }
+              onCheckedChange={(checked) => onToggleAllQualifying(checked === true)}
               aria-label="Select all qualifying contacts on this page"
             />
           </TableHead>
           <TableHead>Name</TableHead>
           <TableHead>Email</TableHead>
+          <TableHead>Phone</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -65,15 +61,14 @@ export function ContactsTable({
                 <Checkbox
                   checked={checkedIds.has(contact.id)}
                   disabled={!qualifies}
-                  onCheckedChange={(checked) =>
-                    onCheckedChange(contact, checked === true)
-                  }
+                  onCheckedChange={(checked) => onCheckedChange(contact, checked === true)}
                   aria-label={`Select ${contact.displayName}`}
                 />
               </TableCell>
               <TableCell>{contact.displayName}</TableCell>
+              <TableCell className="text-muted-foreground">{contact.email || "—"}</TableCell>
               <TableCell className="text-muted-foreground">
-                {contact.email || "—"}
+                {contact.sanitizedPhone || "—"}
               </TableCell>
             </TableRow>
           )

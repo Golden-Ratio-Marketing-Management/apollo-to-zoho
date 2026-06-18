@@ -66,6 +66,7 @@ export default async function ImporterPage() {
         accounts={accountsResult.data}
         campaigns={campaignsResult.data}
         userRole={user.role}
+        userEmail={user.email}
       />
     </main>
   )
