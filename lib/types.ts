@@ -3,6 +3,9 @@ export interface ZohoItem {
   Last_Name: string
   Lead_Source: "Apollo.io"
   Lead_Status: "Not Contacted"
+  Owner: {
+    email: string
+  }
   Client_Campaign: string
   Email: string
   Personal_Email?: string
