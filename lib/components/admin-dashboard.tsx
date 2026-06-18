@@ -54,7 +54,7 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
-      <SiteHeader role={currentUser.role} />
+      <SiteHeader email={currentUser.email} role={currentUser.role} />
 
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
