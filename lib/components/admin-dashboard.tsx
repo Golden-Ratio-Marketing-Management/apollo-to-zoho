@@ -64,7 +64,7 @@ export function AdminDashboard({
       </div>
 
       <ZohoSecretsCard initialStatus={zohoStatus} />
-      <ApolloAccountsManager initialAccounts={initialAccounts} compact />
+      <ApolloAccountsManager initialAccounts={initialAccounts} compact email={currentUser.email} />
       <UsersCard currentUserId={currentUser.id} initialUsers={initialUsers} />
     </div>
   )
