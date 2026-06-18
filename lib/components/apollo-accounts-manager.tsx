@@ -27,11 +27,13 @@ import {
 type ApolloAccountsManagerProps = {
   initialAccounts: ApolloAccountPublic[]
   compact?: boolean
+  email: string
 }
 
 export function ApolloAccountsManager({
   initialAccounts,
-  compact = false
+  compact = false,
+  email
 }: ApolloAccountsManagerProps) {
   const [accounts, setAccounts] = useState(initialAccounts)
   const [accountName, setAccountName] = useState("")
@@ -83,7 +85,7 @@ export function ApolloAccountsManager({
 
   return (
     <div className={compact ? "flex flex-col gap-6" : "flex flex-col gap-6 p-6"}>
-      {!compact && <SiteHeader role="admin" />}
+      {!compact && <SiteHeader role="admin" email={email} />}
 
       {!compact && (
         <div className="flex flex-col gap-2">
