@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Loader2Icon } from "lucide-react"
 import { fetchApolloContacts, fetchApolloLists, pushToZoho } from "@/lib/actions"
-import { contactToZohoItem, isQualifyingContact } from "@/lib/contacts"
+import { contactToZohoItem, getZohoRowErrors, isQualifyingContact } from "@/lib/contacts"
 import { SiteHeader } from "@/lib/components/site-header"
 import { OptionSelect } from "@/lib/components/option-select"
 import { ContactsTable } from "@/lib/components/contacts-table"
@@ -14,7 +14,7 @@ import { Button } from "@/lib/components/ui/button"
 import { Spinner } from "@/lib/components/ui/spinner"
 import { Skeleton } from "@/lib/components/ui/skeleton"
 import { CONTACTS_PER_PAGE_OPTIONS, DEFAULT_CONTACTS_PER_PAGE } from "@/lib/constants"
-import type { NormalizedContact, SelectOption } from "@/lib/types"
+import type { NormalizedContact, SelectOption, ZohoResultItem } from "@/lib/types"
 
 type ImporterProps = {
   accounts: SelectOption[]
@@ -39,20 +39,16 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
   const [perPage, setPerPage] = useState<number>(DEFAULT_CONTACTS_PER_PAGE)
   const [totalPages, setTotalPages] = useState(0)
   const [totalEntries, setTotalEntries] = useState(0)
-  const [checkedById, setCheckedById] = useState<Map<string, NormalizedContact>>(() => new Map())
   const [pushStatus, setPushStatus] = useState<AsyncStatus>("idle")
   const [pushError, setPushError] = useState<string | null>(null)
 
-  const checkedCount = checkedById.size
-
-  const qualifyingCheckedCount = useMemo(
-    () => Array.from(checkedById.values()).filter((contact) => isQualifyingContact(contact)).length,
-    [checkedById]
+  const checkedCount = useMemo(
+    () => contacts.reduce((acc, curr) => (curr?.checked ? acc + 1 : acc), 0),
+    [contacts]
   )
 
   const canPush =
-    Boolean(accountId && listId && campaign && qualifyingCheckedCount > 0) &&
-    pushStatus !== "loading"
+    Boolean(accountId && listId && campaign && checkedCount > 0) && pushStatus !== "loading"
 
   const resetContactsState = useCallback(() => {
     setContacts([])
@@ -61,7 +57,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
     setPage(1)
     setTotalPages(0)
     setTotalEntries(0)
-    setCheckedById(new Map())
     setPushStatus("idle")
     setPushError(null)
   }, [])
@@ -114,7 +109,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
 
   useEffect(() => {
     if (!accountId || !listId) return
-
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadContacts(accountId, listId, page, perPage)
   }, [accountId, listId, page, perPage, loadContacts])
@@ -134,7 +128,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
     setListId(value)
 
     setPage(1)
-    setCheckedById(new Map())
 
     setPushStatus("idle")
     setPushError(null)
@@ -150,43 +143,25 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
   }
 
   const handleCheckedChange = (contact: NormalizedContact, checked: boolean) => {
-    setCheckedById((current) => {
-      const next = new Map(current)
-
-      if (checked) {
-        next.set(contact.id, contact)
-      } else {
-        next.delete(contact.id)
-      }
-
-      return next
-    })
+    setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, checked } : c)))
   }
 
   const handleToggleAllQualifying = (checked: boolean) => {
-    setCheckedById((current) => {
-      const next = new Map(current)
-
-      for (const contact of contacts) {
-        if (!isQualifyingContact(contact)) continue
-
-        if (checked) {
-          next.set(contact.id, contact)
-        } else {
-          next.delete(contact.id)
-        }
-      }
-
-      return next
-    })
+    setContacts((prev) =>
+      prev.map((c) => {
+        return { ...c, checked }
+      })
+    )
   }
 
   const handlePush = async () => {
     if (!campaign) return
 
-    const payload = [...checkedById.values()]
-      .filter(isQualifyingContact)
-      .map((contact) => contactToZohoItem(contact, campaign, userEmail))
+    const selectedRows = contacts.filter((c) => c.checked && isQualifyingContact(c))
+
+    if (selectedRows.length === 0) return
+
+    const payload = selectedRows.map((contact) => contactToZohoItem(contact, campaign, userEmail))
 
     setPushStatus("loading")
     setPushError(null)
@@ -195,15 +170,66 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
 
     if (!result.ok) {
       setPushStatus("error")
-      setPushError(result.error)
-      toast.error(result.error)
+      setPushError(result.error ?? "Push request failed")
+      setContacts((prev) =>
+        prev.map((c) =>
+          selectedRows.some((s) => s.id === c.id)
+            ? { ...c, pushStatus: "error", pushErrors: ["Request failed"] }
+            : c
+        )
+      )
       return
     }
 
-    setPushStatus("success")
-    setCheckedById(new Map())
+    const zohoResults: ZohoResultItem[] = result.data.results
 
-    toast.success(`Pushed ${result.data.pushed} contact(s) to Zoho`)
+    let successCount = 0
+    let errorCount = 0
+
+    const resolvedById = new Map<
+      string,
+      { pushStatus: "success" | "error"; pushErrors?: string[]; checked: boolean }
+    >()
+
+    zohoResults.forEach((zohoItem, index) => {
+      const row = selectedRows[index]
+      if (!row) return
+
+      if (zohoItem.status === "success") {
+        successCount++
+        resolvedById.set(row.id, {
+          pushStatus: "success",
+          checked: false
+        })
+      } else {
+        errorCount++
+        resolvedById.set(row.id, {
+          pushStatus: "error",
+          pushErrors: getZohoRowErrors(zohoItem),
+          checked: true
+        })
+      }
+    })
+
+    setContacts((prev) =>
+      prev.map((c) => {
+        const resolved = resolvedById.get(c.id)
+        return resolved ? { ...c, ...resolved } : c
+      })
+    )
+
+    if (successCount > 0 && errorCount === 0) {
+      setPushStatus("success")
+      toast.success(`Pushed ${successCount} contact(s) to Zoho`)
+    } else if (successCount > 0 && errorCount > 0) {
+      setPushStatus("error")
+      toast.warning(
+        `${successCount} pushed, ${errorCount} failed, check the Status column for details`
+      )
+    } else {
+      setPushStatus("error")
+      toast.error(`All ${errorCount} records failed, check the Status column for details`)
+    }
   }
 
   const perPageOptions = CONTACTS_PER_PAGE_OPTIONS.map(String)
@@ -216,11 +242,7 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
         <h1 className="text-2xl font-semibold tracking-tight">Apollo to Zoho</h1>
 
         <p className="text-muted-foreground text-sm">
-          A maximum of 100 records can be pushed at once.
-        </p>
-
-        <p className="text-muted-foreground text-sm">
-          Internal tool only — do not share access, credentials, or this URL.
+          Internal tool, do not share access, credentials, or this URL.
         </p>
       </div>
 
@@ -297,7 +319,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
           {contactsStatus === "error" && contactsError && (
             <Alert variant="destructive">
               <AlertTitle>Could not load contacts</AlertTitle>
-
               <AlertDescription>{contactsError}</AlertDescription>
             </Alert>
           )}
@@ -305,7 +326,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
           {contactsStatus === "success" && contacts.length === 0 && (
             <Alert>
               <AlertTitle>No contacts found</AlertTitle>
-
               <AlertDescription>
                 This list has no contacts matching the current page.
               </AlertDescription>
@@ -315,7 +335,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
           {contactsStatus === "success" && contacts.length > 0 && (
             <ContactsTable
               contacts={contacts}
-              checkedIds={new Set(checkedById.keys())}
               onCheckedChange={handleCheckedChange}
               onToggleAllQualifying={handleToggleAllQualifying}
             />
@@ -324,8 +343,7 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
           {contactsStatus === "success" && (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
-                {totalEntries} contact
-                {totalEntries === 1 ? "" : "s"} in this list
+                Total contacts in list: {totalEntries}
                 {checkedCount > 0 ? ` · ${checkedCount} selected` : ""}
               </p>
 

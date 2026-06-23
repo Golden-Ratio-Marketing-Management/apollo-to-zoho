@@ -1,4 +1,4 @@
-import type { ApolloContactRaw, NormalizedContact, ZohoItem } from "@/lib/types"
+import type { ApolloContactRaw, NormalizedContact, ZohoItem, ZohoResultItem } from "@/lib/types"
 
 function extractPhoneNumbers(contact: ApolloContactRaw): string[] {
   const numbers: string[] = []
@@ -49,7 +49,8 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
       contact.organization_name?.trim() || contact.organization?.name?.trim() || undefined,
     organizationWebsite: contact.organization?.website_url?.trim() || undefined,
     organizationLinkedin: contact.organization?.linkedin_url?.trim() || undefined,
-    personalEmail: extractPersonalEmail(contact)
+    personalEmail: extractPersonalEmail(contact),
+    checked: false
   }
 }
 
@@ -81,9 +82,32 @@ export function contactToZohoItem(
   if (contact.linkedinUrl) item.LinkedIn_Profile = contact.linkedinUrl
   if (contact.organizationName) item.Company = contact.organizationName
   if (contact.organizationWebsite) item.Website = contact.organizationWebsite
-  if (contact.organizationLinkedin) {
-    item.Company_LinkedIn_Profile = contact.organizationLinkedin
-  }
+  if (contact.organizationLinkedin) item.Company_LinkedIn_Profile = contact.organizationLinkedin
 
   return item
+}
+
+export function getZohoRowErrors(item: ZohoResultItem): string[] {
+  if (item.status === "success") return []
+
+  if (item.code === "MULTIPLE_OR_MULTI_ERRORS" && item.details.errors?.length) {
+    const hasDuplicate = item.details.errors.some((e) => e.code === "DUPLICATE_DATA")
+
+    if (hasDuplicate) {
+      return ["Ignored (Exists in CRM)"]
+    }
+
+    return item.details.errors.map((e) => {
+      const field = e.details.api_name ?? "Unknown field"
+      return `${field}: ${e.message}`
+    })
+  }
+
+  const field = item.details.api_name
+  if (field) {
+    if (item.code === "DUPLICATE_DATA") return ["Ignored (Exists in CRM)"]
+    return [`${field}: ${item.message}`]
+  }
+
+  return [item.message ?? "Unknown error"]
 }
