@@ -343,7 +343,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
           {contactsStatus === "success" && (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground text-sm">
-                Total contacts in list: {totalEntries}
                 {checkedCount > 0 ? ` · ${checkedCount} selected` : ""}
               </p>
 
