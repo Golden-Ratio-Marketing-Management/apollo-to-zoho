@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("h-full antialiased", "font-sans", ibmPlexSans.variable)}>
       <body>
-        <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-center">
+        <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-center">
           {children}
           <Toaster richColors position="top-center" />
         </div>
