@@ -3,7 +3,7 @@ export interface ZohoItem {
   Last_Name: string
   Lead_Source: "Apollo.io"
   Lead_Status: "Not Contacted"
-  Owner: {
+  Owner?: {
     email: string
   }
   Client_Campaign: string
@@ -113,6 +113,9 @@ export interface NormalizedContact {
   organizationWebsite?: string
   organizationLinkedin?: string
   personalEmail?: string
+  checked?: boolean
+  pushStatus?: string
+  pushErrors?: string[]
 }
 
 export interface ContactsPage {
@@ -133,3 +136,29 @@ export interface ZohoGrantResult {
   token_type: string
   expires_in: 3600
 }
+
+export type ZohoResultItem =
+  | {
+      status: "success"
+      data: { id: string }
+      code: string
+      details: Record<string, unknown>
+      message: string
+    }
+  | {
+      status: "error"
+      code: string
+      message: string
+      details: {
+        errors?: Array<{
+          code: string
+          message: string
+          details: {
+            api_name: string
+            duplicate_record?: { id: string }
+          }
+        }>
+        api_name?: string
+        duplicate_record?: { id: string }
+      }
+    }

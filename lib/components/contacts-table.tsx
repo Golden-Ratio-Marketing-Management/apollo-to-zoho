@@ -11,27 +11,22 @@ import {
 } from "@/lib/components/ui/table"
 import { isQualifyingContact } from "@/lib/contacts"
 import type { NormalizedContact } from "@/lib/types"
+import { useMemo } from "react"
 
 type ContactsTableProps = {
   contacts: NormalizedContact[]
-  checkedIds: Set<string>
   onCheckedChange: (contact: NormalizedContact, checked: boolean) => void
   onToggleAllQualifying: (checked: boolean) => void
 }
 
 export function ContactsTable({
   contacts,
-  checkedIds,
   onCheckedChange,
   onToggleAllQualifying
 }: ContactsTableProps) {
-  const qualifying = contacts.filter(isQualifyingContact)
-  const qualifyingIds = qualifying.map((contact) => contact.id)
-  const selectedQualifyingCount = qualifyingIds.filter((id) => checkedIds.has(id)).length
-
-  const allQualifyingChecked =
-    qualifying.length > 0 && selectedQualifyingCount === qualifying.length
-  const someQualifyingChecked = selectedQualifyingCount > 0 && !allQualifyingChecked
+  const checkedCount = useMemo(() => contacts.filter((c) => c.checked).length, [contacts])
+  const allQualifyingChecked = checkedCount === contacts.length
+  const someQualifyingChecked = checkedCount > 0 && checkedCount !== contacts.length
 
   return (
     <Table>
@@ -41,14 +36,15 @@ export function ContactsTable({
             <Checkbox
               checked={allQualifyingChecked}
               indeterminate={someQualifyingChecked}
-              disabled={qualifying.length === 0}
-              onCheckedChange={(checked) => onToggleAllQualifying(checked === true)}
+              disabled={contacts.length === 0}
+              onCheckedChange={onToggleAllQualifying}
               aria-label="Select all qualifying contacts on this page"
             />
           </TableHead>
           <TableHead>Name</TableHead>
           <TableHead>Email</TableHead>
           <TableHead>Phone</TableHead>
+          <TableHead>Status</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -59,16 +55,21 @@ export function ContactsTable({
             <TableRow key={contact.id}>
               <TableCell>
                 <Checkbox
-                  checked={checkedIds.has(contact.id)}
+                  checked={contact.checked}
                   disabled={!qualifies}
-                  onCheckedChange={(checked) => onCheckedChange(contact, checked === true)}
+                  onCheckedChange={(checked) => onCheckedChange(contact, checked)}
                   aria-label={`Select ${contact.displayName}`}
                 />
               </TableCell>
               <TableCell>{contact.displayName}</TableCell>
-              <TableCell className="text-muted-foreground">{contact.email || "—"}</TableCell>
+              <TableCell className="text-muted-foreground">{contact.email || "-"}</TableCell>
               <TableCell className="text-muted-foreground">
-                {contact.sanitizedPhone || "—"}
+                {contact.sanitizedPhone || "-"}
+              </TableCell>
+              <TableCell>
+                {contact?.pushStatus === "success"
+                  ? "Success"
+                  : contact?.pushErrors?.join(", ") || "-"}
               </TableCell>
             </TableRow>
           )

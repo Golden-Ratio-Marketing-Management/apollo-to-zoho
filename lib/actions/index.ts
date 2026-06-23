@@ -5,7 +5,7 @@ import { decrypt, encrypt } from "@/lib/crypto"
 import { normalizeApolloContact } from "@/lib/contacts"
 import { requireAdmin, requireUser } from "@/lib/auth"
 import { writeAuditLog } from "@/lib/audit"
-import { APOLLO_CONTACT_MODALITY, MAX_ZOHO_BATCH } from "@/lib/constants"
+import { APOLLO_CONTACT_MODALITY } from "@/lib/constants"
 import { db } from "@/lib/db"
 import { apolloAccounts, zohoSecrets } from "@/lib/db/schema"
 import type {
@@ -15,7 +15,8 @@ import type {
   ContactsPage,
   SelectOption,
   ZohoCampaignPicklistResponse,
-  ZohoItem
+  ZohoItem,
+  ZohoResultItem
 } from "@/lib/types"
 
 function apolloHeaders(apiKey: string) {
@@ -123,10 +124,6 @@ export async function fetchApolloContacts(
       })
     })
 
-    if (!res.ok) {
-      return { ok: false, error: "Failed to load contacts" }
-    }
-
     const data = (await res.json()) as {
       contacts: ApolloContactRaw[]
       pagination: {
@@ -135,6 +132,11 @@ export async function fetchApolloContacts(
         total_entries: number
         total_pages: number
       }
+    }
+
+    if (!res.ok) {
+      console.error(data)
+      return { ok: false, error: "Failed to load contacts" }
     }
 
     return {
@@ -190,6 +192,7 @@ export async function fetchZohoToken(): Promise<ActionResult<string>> {
     const data = await res.json()
 
     if (!res.ok) {
+      console.error(data)
       return { ok: false, error: "Failed to fetch Zoho access token" }
     }
 
@@ -228,11 +231,12 @@ export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
       }
     )
 
+    const data = (await res.json()) as ZohoCampaignPicklistResponse
+
     if (!res.ok) {
+      console.error(data)
       return { ok: false, error: "Failed to fetch campaigns" }
     }
-
-    const data = (await res.json()) as ZohoCampaignPicklistResponse
 
     return {
       ok: true,
@@ -245,25 +249,9 @@ export async function fetchCampaigns(): Promise<ActionResult<string[]>> {
   }
 }
 
-async function pushZohoBatch(accessToken: string, contacts: ZohoItem[]): Promise<ActionResult> {
-  const res = await fetch(`${process.env.ZOHO_API_URL}/Leads/upsert`, {
-    method: "POST",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ data: contacts }),
-    cache: "no-cache"
-  })
-
-  if (!res.ok) {
-    return { ok: false, error: "Failed to push contacts to Zoho" }
-  }
-
-  return { ok: true, data: undefined }
-}
-
-export async function pushToZoho(contacts: ZohoItem[]): Promise<ActionResult<{ pushed: number }>> {
+export async function pushToZoho(
+  contacts: ZohoItem[]
+): Promise<ActionResult<{ pushed: number; results: ZohoResultItem[] }>> {
   const actor = await requireUser()
 
   try {
@@ -274,22 +262,77 @@ export async function pushToZoho(contacts: ZohoItem[]): Promise<ActionResult<{ p
     const tokenResult = await fetchZohoToken()
     if (!tokenResult.ok) return tokenResult
 
-    for (let index = 0; index < contacts.length; index += MAX_ZOHO_BATCH) {
-      const batch = contacts.slice(index, index + MAX_ZOHO_BATCH)
-      const result = await pushZohoBatch(tokenResult.data, batch)
-      if (!result.ok) return result
-    }
-
-    await writeAuditLog({
-      actorId: actor.id,
-      action: "zoho.push_contacts",
-      targetType: "zoho",
-      metadata: { count: contacts.length }
+    const res = await fetch(`${process.env.ZOHO_API_URL}/Leads`, {
+      method: "POST",
+      headers: {
+        Authorization: `Zoho-oauthtoken ${tokenResult.data}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ data: contacts }),
+      cache: "no-cache"
     })
 
-    return { ok: true, data: { pushed: contacts.length } }
-  } catch {
-    return { ok: false, error: "Failed to push contacts to Zoho" }
+    const rawBody = await res.text()
+
+    let json: { data?: ZohoResultItem[] } | null = null
+
+    try {
+      json = JSON.parse(rawBody)
+    } catch {
+      // ignore parse failures
+    }
+
+    // If Zoho returned per-row results, use them regardless of HTTP status
+    if (json?.data && Array.isArray(json.data)) {
+      const results = json.data
+
+      const pushed = results.filter((r) => r.status === "success").length
+
+      await writeAuditLog({
+        actorId: actor.id,
+        action: "zoho.push_contacts",
+        targetType: "zoho",
+        metadata: {
+          attempted: contacts.length,
+          pushed,
+          httpStatus: res.status
+        }
+      })
+
+      return {
+        ok: true,
+        data: {
+          pushed,
+          results
+        }
+      }
+    }
+
+    // Genuine HTTP failure with no usable result payload
+    if (!res.ok) {
+      console.error("Zoho error response:", {
+        status: res.status,
+        statusText: res.statusText,
+        body: rawBody
+      })
+
+      return {
+        ok: false,
+        error: `Zoho API error: ${res.status} ${res.statusText}`
+      }
+    }
+
+    return {
+      ok: false,
+      error: "Zoho returned an unexpected response"
+    }
+  } catch (error) {
+    console.error("pushToZoho failed:", error)
+
+    return {
+      ok: false,
+      error: "Failed to push contacts to Zoho"
+    }
   }
 }
 
