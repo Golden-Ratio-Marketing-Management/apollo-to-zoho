@@ -38,7 +38,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState<number>(DEFAULT_CONTACTS_PER_PAGE)
   const [totalPages, setTotalPages] = useState(0)
-  const [totalEntries, setTotalEntries] = useState(0)
   const [pushStatus, setPushStatus] = useState<AsyncStatus>("idle")
   const [pushError, setPushError] = useState<string | null>(null)
 
@@ -56,7 +55,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
     setContactsError(null)
     setPage(1)
     setTotalPages(0)
-    setTotalEntries(0)
     setPushStatus("idle")
     setPushError(null)
   }, [])
@@ -95,7 +93,6 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
       setContacts(result.data.contacts)
       setPage(result.data.pagination.page)
       setTotalPages(result.data.pagination.totalPages)
-      setTotalEntries(result.data.pagination.totalEntries)
       setContactsStatus("success")
     },
     []

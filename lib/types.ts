@@ -15,6 +15,7 @@ export interface ZohoItem {
   LinkedIn_Profile?: string
   Company?: string
   Website?: string
+  Country?: string
   Company_LinkedIn_Profile?: string
 }
 
@@ -92,6 +93,9 @@ export interface ApolloContactRaw {
   organization_name?: string | null
   contact_emails?: ApolloContactEmail[]
   phone_numbers?: ApolloPhoneNumber[]
+  account?: {
+    country: string
+  }
   organization?: {
     website_url?: string | null
     linkedin_url?: string | null
@@ -112,6 +116,7 @@ export interface NormalizedContact {
   organizationName?: string
   organizationWebsite?: string
   organizationLinkedin?: string
+  organizationCountry?: string
   personalEmail?: string
   checked?: boolean
   pushStatus?: string
