@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache"
 import { eq } from "drizzle-orm"
 import { encrypt } from "@/lib/crypto"
 import { requireAdmin } from "@/lib/auth"
-import { writeAuditLog } from "@/lib/audit"
 import { db } from "@/lib/db"
 import { apolloAccounts } from "@/lib/db/schema"
 import type { ActionResult } from "@/lib/types"
@@ -14,28 +13,27 @@ export type ApolloAccountPublic = {
   account: string
 }
 
-export async function listApolloAccountsAdmin(): Promise<
-  ActionResult<ApolloAccountPublic[]>
-> {
+export async function listApolloAccountsAdmin(): Promise<ActionResult<ApolloAccountPublic[]>> {
   await requireAdmin()
 
   try {
     const rows = await db
       .select({
         id: apolloAccounts.id,
-        account: apolloAccounts.account,
+        account: apolloAccounts.account
       })
       .from(apolloAccounts)
 
     return { ok: true, data: rows }
-  } catch {
+  } catch (error) {
+    console.error(error)
     return { ok: false, error: "Failed to load Apollo accounts" }
   }
 }
 
 export async function addApolloAccount(
   account: string,
-  apiKey: string,
+  apiKey: string
 ): Promise<ActionResult<ApolloAccountPublic>> {
   const actor = await requireAdmin()
   const name = account.trim()
@@ -65,35 +63,24 @@ export async function addApolloAccount(
       .values({
         account: name,
         encryptedKey: encrypt(key),
-        adminId: actor.id,
+        adminId: actor.id
       })
       .returning({
         id: apolloAccounts.id,
-        account: apolloAccounts.account,
+        account: apolloAccounts.account
       })
-
-    await writeAuditLog({
-      actorId: actor.id,
-      action: "apollo_account.create",
-      targetType: "apollo_account",
-      targetId: row.id,
-      metadata: { account: name },
-    })
 
     revalidatePath("/importer")
     revalidatePath("/admin")
 
     return { ok: true, data: row }
-  } catch {
+  } catch (error) {
+    console.error(error)
     return { ok: false, error: "Failed to add Apollo account" }
   }
 }
 
-export async function removeApolloAccount(
-  id: string,
-): Promise<ActionResult<void>> {
-  const actor = await requireAdmin()
-
+export async function removeApolloAccount(id: string): Promise<ActionResult<void>> {
   if (!id.trim()) {
     return { ok: false, error: "Account id is required" }
   }
@@ -108,18 +95,12 @@ export async function removeApolloAccount(
       return { ok: false, error: "Account not found" }
     }
 
-    await writeAuditLog({
-      actorId: actor.id,
-      action: "apollo_account.remove",
-      targetType: "apollo_account",
-      targetId: id,
-    })
-
     revalidatePath("/importer")
     revalidatePath("/admin")
 
     return { ok: true, data: undefined }
-  } catch {
+  } catch (error) {
+    console.error(error)
     return { ok: false, error: "Failed to remove Apollo account" }
   }
 }

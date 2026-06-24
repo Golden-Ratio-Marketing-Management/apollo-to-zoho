@@ -16,7 +16,6 @@ export type UserRole = "admin" | "user"
 export type CurrentUser = {
   id: string
   email: string
-  name: string
   role: UserRole
 }
 
@@ -31,7 +30,7 @@ export async function createSession(userId: string) {
   await db.insert(sessions).values({
     userId,
     tokenHash: hashSessionToken(token),
-    expiresAt,
+    expiresAt
   })
 
   const cookieStore = await cookies()
@@ -40,7 +39,7 @@ export async function createSession(userId: string) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: expiresAt,
+    expires: expiresAt
   })
 }
 
@@ -49,9 +48,7 @@ export async function clearSession() {
   const token = cookieStore.get(sessionCookieName)?.value
 
   if (token) {
-    await db
-      .delete(sessions)
-      .where(eq(sessions.tokenHash, hashSessionToken(token)))
+    await db.delete(sessions).where(eq(sessions.tokenHash, hashSessionToken(token)))
   }
 
   cookieStore.delete(sessionCookieName)
@@ -70,31 +67,23 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       sessionId: sessions.id,
       userId: users.id,
       email: users.email,
-      name: users.name,
-      role: users.role,
-      revokedAt: users.revokedAt,
+      role: users.role
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(
-      and(
-        eq(sessions.tokenHash, hashSessionToken(token)),
-        gt(sessions.expiresAt, new Date()),
-      ),
-    )
+    .where(and(eq(sessions.tokenHash, hashSessionToken(token)), gt(sessions.expiresAt, new Date())))
     .limit(1)
 
   const row = rows[0]
 
-  if (!row || row.revokedAt) {
+  if (!row) {
     return null
   }
 
   return {
     id: row.userId,
     email: row.email,
-    name: row.name,
-    role: row.role,
+    role: row.role
   }
 })
 

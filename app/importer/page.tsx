@@ -6,8 +6,6 @@ import { signOut } from "@/lib/actions/auth"
 import { requireUser } from "@/lib/auth"
 import { Button } from "@/lib/components/ui/button"
 
-export const dynamic = "force-dynamic"
-
 export default async function ImporterPage() {
   const user = await requireUser()
   const [accountsResult, campaignsResult] = await Promise.all([

@@ -6,7 +6,6 @@ import { Button } from "@/lib/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/lib/components/ui/card"
 
 export default function Error({
-  error,
   reset
 }: {
   error: Error & { digest?: string }
@@ -32,12 +31,6 @@ export default function Error({
         </CardHeader>
 
         <CardContent className="space-y-6">
-          <div className="bg-muted/40 rounded-md border p-3">
-            <p className="text-muted-foreground font-mono text-sm wrap-break-word">
-              {error.message || "Unknown error"}
-            </p>
-          </div>
-
           <Button onClick={reset} className="w-full gap-2" size="lg">
             <RefreshCw className="h-4 w-4" />
             Try again

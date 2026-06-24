@@ -6,16 +6,16 @@ export const users = sqliteTable("users", {
     .primaryKey()
     .$default(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
-  name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
-  revokedAt: integer("revoked_at", { mode: "timestamp" }),
+  role: text("role", { enum: ["admin", "user"] })
+    .notNull()
+    .default("user"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$default(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .$default(() => new Date()),
+    .$default(() => new Date())
 })
 
 export const sessions = sqliteTable("sessions", {
@@ -29,7 +29,7 @@ export const sessions = sqliteTable("sessions", {
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
-    .$default(() => new Date()),
+    .$default(() => new Date())
 })
 
 export const apolloAccounts = sqliteTable("apolloAccounts", {
@@ -44,7 +44,7 @@ export const apolloAccounts = sqliteTable("apolloAccounts", {
     .$default(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .$default(() => new Date()),
+    .$default(() => new Date())
 })
 
 export const zohoSecrets = sqliteTable("zohoSecrets", {
@@ -56,48 +56,34 @@ export const zohoSecrets = sqliteTable("zohoSecrets", {
   encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
   encryptedAccessToken: text("encrypted_access_token").notNull(),
   accessTokenExpiresAt: integer("access_token_expires_at", {
-    mode: "timestamp",
+    mode: "timestamp"
   }).notNull(),
   configuredById: text("configured_by_id").references(() => users.id, {
-    onDelete: "set null",
+    onDelete: "set null"
   }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$default(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .$default(() => new Date()),
-})
-
-export const auditLogs = sqliteTable("auditLogs", {
-  id: text("id")
-    .primaryKey()
-    .$default(() => crypto.randomUUID()),
-  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
-  action: text("action").notNull(),
-  targetType: text("target_type").notNull(),
-  targetId: text("target_id"),
-  metadata: text("metadata"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$default(() => new Date()),
+    .$default(() => new Date())
 })
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
-  apolloAccounts: many(apolloAccounts),
+  apolloAccounts: many(apolloAccounts)
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, {
     fields: [sessions.userId],
-    references: [users.id],
-  }),
+    references: [users.id]
+  })
 }))
 
 export const apolloAccountsRelations = relations(apolloAccounts, ({ one }) => ({
   admin: one(users, {
     fields: [apolloAccounts.adminId],
-    references: [users.id],
-  }),
+    references: [users.id]
+  })
 }))

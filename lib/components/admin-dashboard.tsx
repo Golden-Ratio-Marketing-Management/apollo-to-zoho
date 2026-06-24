@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2Icon } from "lucide-react"
-import { configureZohoSecrets } from "@/lib/actions"
-import { createUser, revokeUser } from "@/lib/actions/auth"
+import { configureZohoSecrets, resetZohoToken } from "@/lib/actions"
+import { createUser, deleteUser, resetPassword } from "@/lib/actions/auth"
 import { ApolloAccountsManager } from "@/lib/components/apollo-accounts-manager"
 import { SiteHeader } from "@/lib/components/site-header"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
@@ -28,15 +28,14 @@ import {
   TableHeader,
   TableRow
 } from "@/lib/components/ui/table"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/lib/components/ui/tabs"
 import type { CurrentUser } from "@/lib/auth"
 import type { ApolloAccountPublic } from "@/lib/actions/apollo-accounts"
 
 type AdminUser = {
   id: string
   email: string
-  name: string
   role: "admin" | "user"
-  revokedAt: Date | null
 }
 
 type AdminDashboardProps = {
@@ -63,9 +62,26 @@ export function AdminDashboard({
         </p>
       </div>
 
-      <ZohoSecretsCard initialStatus={zohoStatus} />
-      <ApolloAccountsManager initialAccounts={initialAccounts} compact email={currentUser.email} />
-      <UsersCard currentUserId={currentUser.id} initialUsers={initialUsers} />
+      <Tabs defaultValue="users" className="gap-5">
+        <TabsList variant="line">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="apollo">Apollo.io</TabsTrigger>
+          <TabsTrigger value="zoho">Zoho CRM</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users">
+          <UsersCard currentUserId={currentUser.id} initialUsers={initialUsers} />
+        </TabsContent>
+        <TabsContent value="apollo">
+          <ApolloAccountsManager
+            initialAccounts={initialAccounts}
+            compact
+            email={currentUser.email}
+          />
+        </TabsContent>
+        <TabsContent value="zoho">
+          <ZohoSecretsCard initialStatus={zohoStatus} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
@@ -78,6 +94,7 @@ function ZohoSecretsCard({
   const [status, setStatus] = useState(initialStatus)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -105,6 +122,19 @@ function ZohoSecretsCard({
     toast.success("Zoho credentials configured")
   }
 
+  async function handleResetToken() {
+    setResetting(true)
+    const result = await resetZohoToken()
+    setResetting(false)
+
+    if (!result.ok) {
+      toast.error(result.error)
+      return
+    }
+
+    toast.success("Zoho token reset — will refresh on next use")
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -115,7 +145,7 @@ function ZohoSecretsCard({
             : "Not configured yet."}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:max-w-md">
           <SecretField id="clientId" label="Client ID" />
           <SecretField id="clientSecret" label="Client Secret" />
@@ -137,6 +167,34 @@ function ZohoSecretsCard({
             )}
           </Button>
         </form>
+
+        {status.configured && (
+          <div className="sm:max-w-md">
+            <div className="flex flex-col gap-1.5 border-t pt-4">
+              <p className="text-sm font-medium">Reset access token</p>
+              <p className="text-muted-foreground text-sm">
+                Forces a fresh token refresh on the next API call. Use this if requests are failing
+                with invalid token errors.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={resetting}
+                onClick={handleResetToken}
+                className="mt-1 w-fit"
+              >
+                {resetting ? (
+                  <>
+                    <Loader2Icon data-icon="inline-start" className="animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  "Reset token"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -153,6 +211,7 @@ function UsersCard({
   const [role, setRole] = useState<"admin" | "user">("user")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -162,7 +221,6 @@ function UsersCard({
     setLoading(true)
 
     const result = await createUser(
-      String(formData.get("name") ?? ""),
       String(formData.get("email") ?? ""),
       String(formData.get("password") ?? ""),
       role
@@ -178,35 +236,37 @@ function UsersCard({
 
     form.reset()
     setRole("user")
-    setUsers((current) => [...current, { ...result.data, revokedAt: null }])
+    setUsers((current) => [...current, result.data])
     toast.success(`Created ${result.data.email}`)
   }
 
-  async function handleRevoke(id: string) {
-    const result = await revokeUser(id)
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    const result = await deleteUser(id)
+    setDeletingId(null)
 
     if (!result.ok) {
       toast.error(result.error)
       return
     }
 
-    setUsers((current) =>
-      current.map((user) => (user.id === id ? { ...user, revokedAt: new Date() } : user))
-    )
-    toast.success("User revoked")
+    setUsers((current) => current.filter((user) => user.id !== id))
+    toast.success("User deleted")
   }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Users</CardTitle>
-        <CardDescription>Create users and revoke access.</CardDescription>
+        <CardDescription>
+          Only email addresses associated with the GoldenRatio Zoho CRM organization can be used
+          with the importer and should be entered here.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <form onSubmit={handleCreate} className="flex flex-col gap-4 sm:max-w-md">
-          <SecretField id="name" label="Name" type="text" />
           <SecretField id="email" label="Email" type="email" />
-          <SecretField id="password" label="Temporary password" />
+          <SecretField id="password" label="Password" />
           <div className="flex flex-col gap-1.5">
             <Label>Role</Label>
             <Select
@@ -244,39 +304,139 @@ function UsersCard({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead className="w-28 text-right">Actions</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
-                <TableCell className="text-right">
-                  {user.revokedAt ? (
-                    <span className="text-muted-foreground text-sm">Revoked</span>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      disabled={loading || user.id === currentUserId}
-                      onClick={() => handleRevoke(user.id)}
-                    >
-                      Revoke
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
+              <UserRow
+                key={user.id}
+                user={user}
+                currentUserId={currentUserId}
+                onDelete={handleDelete}
+                deletingId={deletingId}
+              />
             ))}
           </TableBody>
         </Table>
       </CardContent>
     </Card>
+  )
+}
+
+function UserRow({
+  user,
+  currentUserId,
+  onDelete,
+  deletingId
+}: {
+  user: AdminUser
+  currentUserId: string
+  onDelete: (id: string) => void
+  deletingId: string | null
+}) {
+  const [resetting, setResetting] = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleResetPassword() {
+    setError(null)
+    setResetting(true)
+    const result = await resetPassword(user.id, password)
+    setResetting(false)
+
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+
+    setPassword("")
+    setShowReset(false)
+    toast.success(`Password reset for ${user.email}`)
+  }
+
+  return (
+    <>
+      <TableRow>
+        <TableCell>{user.email}</TableCell>
+        <TableCell>{user.role}</TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setShowReset((v) => !v)
+                setError(null)
+                setPassword("")
+              }}
+            >
+              Reset password
+            </Button>
+            {user.id !== currentUserId && (
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={deletingId === user.id}
+                onClick={() => onDelete(user.id)}
+              >
+                {deletingId === user.id ? <Loader2Icon className="animate-spin" /> : "Delete"}
+              </Button>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+      {showReset && (
+        <TableRow>
+          <TableCell colSpan={4}>
+            <div className="flex flex-col gap-2 py-1 sm:max-w-sm">
+              <Input
+                type="password"
+                placeholder="New password (min. 12 characters)"
+                autoComplete="off"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {error && <p className="text-destructive text-sm">{error}</p>}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={resetting || password.length < 12}
+                  onClick={handleResetPassword}
+                >
+                  {resetting ? (
+                    <>
+                      <Loader2Icon data-icon="inline-start" className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save password"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowReset(false)
+                    setError(null)
+                    setPassword("")
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   )
 }
 
