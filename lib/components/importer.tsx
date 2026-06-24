@@ -111,13 +111,13 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
   }, [accountId, listId, page, perPage, loadContacts])
 
   const handleAccountChange = (value: string) => {
-    setAccountId(value)
+    if (value === accountId) return
 
+    setAccountId(value)
     setListId("")
     setLists([])
     setListsStatus("idle")
     setListsError(null)
-
     resetContactsState()
   }
 
