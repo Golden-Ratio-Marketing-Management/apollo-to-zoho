@@ -49,6 +49,7 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
       contact.organization_name?.trim() || contact.organization?.name?.trim() || undefined,
     organizationWebsite: contact.organization?.website_url?.trim() || undefined,
     organizationLinkedin: contact.organization?.linkedin_url?.trim() || undefined,
+    organizationCountry: contact.account?.country,
     personalEmail: extractPersonalEmail(contact),
     checked: false
   }
@@ -83,6 +84,7 @@ export function contactToZohoItem(
   if (contact.organizationName) item.Company = contact.organizationName
   if (contact.organizationWebsite) item.Website = contact.organizationWebsite
   if (contact.organizationLinkedin) item.Company_LinkedIn_Profile = contact.organizationLinkedin
+  if (contact.organizationCountry) item.Country = contact.organizationCountry
 
   return item
 }
