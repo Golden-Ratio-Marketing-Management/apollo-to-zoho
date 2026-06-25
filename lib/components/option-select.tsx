@@ -6,7 +6,7 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from "@/lib/components/ui/select"
 import { Label } from "@/lib/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -19,7 +19,7 @@ type OptionSelectProps = {
   value: string
   onValueChange: (value: string) => void
   disabled?: boolean
-  loading?:boolean
+  loading?: boolean
   className?: string
   layout?: "stacked" | "inline"
   triggerClassName?: string
@@ -27,7 +27,7 @@ type OptionSelectProps = {
 
 function normalizeOptions(options: SelectOption[] | string[]): SelectOption[] {
   return options.map((option) =>
-    typeof option === "string" ? { id: option, label: option } : option,
+    typeof option === "string" ? { id: option, label: option } : option
   )
 }
 
@@ -41,12 +41,12 @@ export function OptionSelect({
   className,
   layout = "stacked",
   triggerClassName,
-  loading=false
+  loading = false
 }: OptionSelectProps) {
   const items = normalizeOptions(options)
   const selectItems = items.map((option) => ({
     value: option.id,
-    label: option.label,
+    label: option.label
   }))
 
   const select = (
@@ -58,12 +58,8 @@ export function OptionSelect({
       }}
     >
       <SelectTrigger
-        className={cn(
-          layout === "inline" ? "w-[4.5rem]" : "w-full",
-          triggerClassName,
-        )}
-      disabled={disabled}
-
+        className={cn(layout === "inline" ? "w-18" : "w-full", triggerClassName)}
+        disabled={disabled}
       >
         {!loading && <SelectValue placeholder={placeholder} />}
         {loading && "Loading..."}
@@ -83,9 +79,7 @@ export function OptionSelect({
   if (layout === "inline") {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <Label className="shrink-0 text-sm font-normal text-muted-foreground">
-          {label}
-        </Label>
+        <Label className="text-muted-foreground shrink-0 text-sm font-normal">{label}</Label>
         {select}
       </div>
     )

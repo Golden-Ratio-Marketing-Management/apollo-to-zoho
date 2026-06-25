@@ -105,7 +105,7 @@ export function ApolloAccountsManager({
 
       <Card>
         <CardHeader>
-          <CardTitle>Add account</CardTitle>
+          <CardTitle>Add Apollo account</CardTitle>
           <CardDescription>
             Enter a display name and the Apollo API key. The key is only used on the server.
           </CardDescription>
@@ -157,7 +157,7 @@ export function ApolloAccountsManager({
 
       <Card>
         <CardHeader>
-          <CardTitle>Saved accounts</CardTitle>
+          <CardTitle>Saved Apollo accounts</CardTitle>
           <CardDescription>
             {accounts.length === 0
               ? "No accounts configured yet."

@@ -2,7 +2,7 @@ import "dotenv/config"
 
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { auditLogs, users } from "@/lib/db/schema"
+import { users } from "@/lib/db/schema"
 import { hashPassword } from "@/lib/passwords"
 
 const [, , emailArg, passwordArg] = process.argv
@@ -12,9 +12,7 @@ async function main() {
   const password = passwordArg ?? ""
 
   if (!email || !password) {
-    throw new Error(
-      "Usage: npm run admin:reset -- admin@example.com new-temporary-password",
-    )
+    throw new Error("Usage: npm run admin:reset -- admin@example.com new-temporary-password")
   }
 
   if (password.length < 12) {
@@ -35,18 +33,9 @@ async function main() {
     .update(users)
     .set({
       passwordHash: await hashPassword(password),
-      revokedAt: null,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     })
     .where(eq(users.id, admin.id))
-
-  await db.insert(auditLogs).values({
-    actorId: null,
-    action: "user.admin_password_reset",
-    targetType: "user",
-    targetId: admin.id,
-    metadata: JSON.stringify({ email }),
-  })
 
   console.log(`Reset password for ${email}`)
 }

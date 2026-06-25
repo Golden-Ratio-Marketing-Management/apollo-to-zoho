@@ -4,13 +4,7 @@ import { useActionState } from "react"
 import { createFirstAdmin, signIn } from "@/lib/actions/auth"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
 import { Button } from "@/lib/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/lib/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/lib/components/ui/card"
 import { Input } from "@/lib/components/ui/input"
 import { Label } from "@/lib/components/ui/label"
 
@@ -20,10 +14,7 @@ type AuthFormsProps = {
 
 export function AuthForms({ bootstrapOpen }: AuthFormsProps) {
   const [signInState, signInAction, signInPending] = useActionState(signIn, {})
-  const [bootstrapState, bootstrapAction, bootstrapPending] = useActionState(
-    createFirstAdmin,
-    {},
-  )
+  const [bootstrapState, bootstrapAction, bootstrapPending] = useActionState(createFirstAdmin, {})
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
@@ -39,14 +30,8 @@ export function AuthForms({ bootstrapOpen }: AuthFormsProps) {
         <CardContent>
           {bootstrapOpen ? (
             <form action={bootstrapAction} className="flex flex-col gap-4">
-              <Field id="name" label="Name" autoComplete="name" />
               <Field id="email" label="Email" type="email" autoComplete="email" />
-              <Field
-                id="password"
-                label="Password"
-                type="password"
-                autoComplete="new-password"
-              />
+              <Field id="password" label="Password" type="password" autoComplete="new-password" />
               <Field
                 id="bootstrapToken"
                 label="Bootstrap token"
@@ -93,7 +78,7 @@ function Field({
   id,
   label,
   type = "text",
-  autoComplete,
+  autoComplete
 }: {
   id: string
   label: string
