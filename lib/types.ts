@@ -17,6 +17,8 @@ export interface ZohoItem {
   Website?: string
   Country?: string
   Company_LinkedIn_Profile?: string
+  Company_Size_Range?: string
+  Industry?: string
 }
 
 export interface ZohoTokenResponse {
@@ -94,7 +96,11 @@ export interface ApolloContactRaw {
   contact_emails?: ApolloContactEmail[]
   phone_numbers?: ApolloPhoneNumber[]
   account?: {
+    id: string
     country: string
+    name: string
+    linkedin_url: string
+    website_url: string
   }
   organization?: {
     website_url?: string | null
@@ -113,10 +119,13 @@ export interface NormalizedContact {
   linkedinUrl?: string
   sanitizedPhone?: string
   alternatePhone?: string
-  organizationName?: string
-  organizationWebsite?: string
-  organizationLinkedin?: string
-  organizationCountry?: string
+  orgID?: string
+  orgName?: string
+  orgWebsite?: string
+  orgLinkedin?: string
+  orgCountry?: string
+  orgIndustry?: string
+  orgSizeRange?: string
   personalEmail?: string
   checked?: boolean
   pushStatus?: string
@@ -167,3 +176,16 @@ export type ZohoResultItem =
         duplicate_record?: { id: string }
       }
     }
+
+export type CompanyInfo = {
+  apolloAccountId: string
+  employeeCount: number
+  industry: string
+  employeeCountRange?: string
+}
+
+export type ApolloAccountRaw = {
+  id: string
+  estimated_num_employees?: number
+  industry?: string
+}

@@ -47,6 +47,15 @@ export const apolloAccounts = sqliteTable("apolloAccounts", {
     .$default(() => new Date())
 })
 
+export const apolloCompany = sqliteTable("apolloCompany", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  apolloAccountId: text("apollo_account_id").notNull().unique(),
+  employeeCount: integer("employee_count").notNull(),
+  industry: text("industry").notNull()
+})
+
 export const zohoSecrets = sqliteTable("zohoSecrets", {
   id: text("id")
     .primaryKey()
