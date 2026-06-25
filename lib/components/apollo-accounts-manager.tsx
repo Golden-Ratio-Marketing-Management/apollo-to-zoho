@@ -8,7 +8,7 @@ import {
   addApolloAccount,
   removeApolloAccount,
   type ApolloAccountPublic
-} from "@/lib/actions/apollo-accounts"
+} from "@/lib/actions/apollo"
 import { SiteHeader } from "@/lib/components/site-header"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
 import { Button } from "@/lib/components/ui/button"

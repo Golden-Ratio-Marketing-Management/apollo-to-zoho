@@ -44,12 +44,12 @@ export function normalizeApolloContact(contact: ApolloContactRaw): NormalizedCon
     title: contact.title?.trim() || undefined,
     linkedinUrl: contact.linkedin_url?.trim() || undefined,
     sanitizedPhone: contact.sanitized_phone || undefined,
-    alternatePhone: phones[1],
-    organizationName:
-      contact.organization_name?.trim() || contact.organization?.name?.trim() || undefined,
-    organizationWebsite: contact.organization?.website_url?.trim() || undefined,
-    organizationLinkedin: contact.organization?.linkedin_url?.trim() || undefined,
-    organizationCountry: contact.account?.country,
+    alternatePhone: phones?.[1],
+    orgID: contact.account?.id,
+    orgName: contact.account?.name?.trim() || undefined,
+    orgWebsite: contact.account?.website_url?.trim() || undefined,
+    orgLinkedin: contact.account?.linkedin_url?.trim() || undefined,
+    orgCountry: contact.account?.country,
     personalEmail: extractPersonalEmail(contact),
     checked: false
   }
@@ -81,10 +81,12 @@ export function contactToZohoItem(
   if (contact.sanitizedPhone) item.Mobile = contact.sanitizedPhone
   if (contact.alternatePhone) item.Alternate_Number = contact.alternatePhone
   if (contact.linkedinUrl) item.LinkedIn_Profile = contact.linkedinUrl
-  if (contact.organizationName) item.Company = contact.organizationName
-  if (contact.organizationWebsite) item.Website = contact.organizationWebsite
-  if (contact.organizationLinkedin) item.Company_LinkedIn_Profile = contact.organizationLinkedin
-  if (contact.organizationCountry) item.Country = contact.organizationCountry
+  if (contact.orgName) item.Company = contact.orgName
+  if (contact.orgWebsite) item.Website = contact.orgWebsite
+  if (contact.orgLinkedin) item.Company_LinkedIn_Profile = contact.orgLinkedin
+  if (contact.orgCountry) item.Country = contact.orgCountry
+  if (contact.orgIndustry) item.Industry = contact.orgIndustry
+  if (contact.orgSizeRange) item.Company_Size_Range = contact.orgSizeRange
 
   return item
 }

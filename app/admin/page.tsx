@@ -1,7 +1,7 @@
 import { AdminDashboard } from "@/lib/components/admin-dashboard"
-import { getZohoConfigurationStatus } from "@/lib/actions"
-import { listApolloAccountsAdmin } from "@/lib/actions/apollo-accounts"
+import { listApolloAccountsAdmin } from "@/lib/actions/apollo"
 import { listUsers } from "@/lib/actions/auth"
+import { getZohoConfigurationStatus } from "@/lib/actions/zoho"
 import { requireAdmin } from "@/lib/auth"
 
 export const dynamic = "force-dynamic"
@@ -11,7 +11,7 @@ export default async function AdminPage() {
   const [accountsResult, usersResult, zohoResult] = await Promise.all([
     listApolloAccountsAdmin(),
     listUsers(),
-    getZohoConfigurationStatus(),
+    getZohoConfigurationStatus()
   ])
 
   if (!accountsResult.ok) throw new Error(accountsResult.error)

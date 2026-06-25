@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation"
 import { Importer } from "@/lib/components/importer"
 import { Alert, AlertDescription, AlertTitle } from "@/lib/components/ui/alert"
-import { fetchApolloAccounts, fetchCampaigns } from "@/lib/actions"
+import { fetchApolloAccounts } from "@/lib/actions/apollo"
 import { signOut } from "@/lib/actions/auth"
+import { fetchCampaigns } from "@/lib/actions/zoho"
 import { requireUser } from "@/lib/auth"
 import { Button } from "@/lib/components/ui/button"
 

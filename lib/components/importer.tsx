@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Loader2Icon } from "lucide-react"
-import { fetchApolloContacts, fetchApolloLists, pushToZoho } from "@/lib/actions"
+import { fetchApolloContacts, fetchApolloLists, fetchCompanyInfoBatch } from "@/lib/actions/apollo"
+import { pushToZoho } from "@/lib/actions/zoho"
 import { contactToZohoItem, getZohoRowErrors, isQualifyingContact } from "@/lib/contacts"
 import { SiteHeader } from "@/lib/components/site-header"
 import { OptionSelect } from "@/lib/components/option-select"
@@ -14,7 +15,7 @@ import { Button } from "@/lib/components/ui/button"
 import { Spinner } from "@/lib/components/ui/spinner"
 import { Skeleton } from "@/lib/components/ui/skeleton"
 import { CONTACTS_PER_PAGE_OPTIONS, DEFAULT_CONTACTS_PER_PAGE } from "@/lib/constants"
-import type { NormalizedContact, SelectOption, ZohoResultItem } from "@/lib/types"
+import type { CompanyInfo, NormalizedContact, SelectOption, ZohoResultItem } from "@/lib/types"
 
 type ImporterProps = {
   accounts: SelectOption[]
@@ -158,10 +159,36 @@ export function Importer({ accounts, campaigns, userRole, userEmail }: ImporterP
 
     if (selectedRows.length === 0) return
 
-    const payload = selectedRows.map((contact) => contactToZohoItem(contact, campaign, userEmail))
-
     setPushStatus("loading")
     setPushError(null)
+
+    const companyIDs = new Set<string>()
+
+    for (const r of selectedRows) {
+      if (r.orgID) companyIDs.add(r.orgID)
+    }
+
+    const companiesInfoResult = await fetchCompanyInfoBatch(accountId, Array.from(companyIDs))
+    const companiesInfo: Map<string, CompanyInfo> = companiesInfoResult.ok
+      ? companiesInfoResult.data
+      : new Map()
+
+    const updatedSelectedRows = selectedRows.map((r) => {
+      if (!r.orgID) return r
+
+      const c = companiesInfo.get(r.orgID)
+      if (c)
+        return {
+          ...r,
+          orgSizeRange: c.employeeCountRange,
+          orgIndustry: c.industry
+        }
+      else return r
+    })
+
+    const payload = updatedSelectedRows.map((contact) =>
+      contactToZohoItem(contact, campaign, userEmail)
+    )
 
     const result = await pushToZoho(payload)
 

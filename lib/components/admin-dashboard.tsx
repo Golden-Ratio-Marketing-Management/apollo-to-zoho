@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2Icon } from "lucide-react"
-import { configureZohoSecrets, resetZohoToken } from "@/lib/actions"
+import { configureZohoSecrets, resetZohoToken } from "@/lib/actions/zoho"
 import { createUser, deleteUser, resetPassword } from "@/lib/actions/auth"
 import { ApolloAccountsManager } from "@/lib/components/apollo-accounts-manager"
 import { SiteHeader } from "@/lib/components/site-header"
@@ -30,7 +30,7 @@ import {
 } from "@/lib/components/ui/table"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/lib/components/ui/tabs"
 import type { CurrentUser } from "@/lib/auth"
-import type { ApolloAccountPublic } from "@/lib/actions/apollo-accounts"
+import type { ApolloAccountPublic } from "@/lib/actions/apollo"
 
 type AdminUser = {
   id: string
