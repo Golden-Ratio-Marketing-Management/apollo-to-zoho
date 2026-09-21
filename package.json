@@ -28,7 +28,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^10.0.5",
-    "oxfmt": "^0.66.0",
+    "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "zoho-extension-toolkit": "^1.0.28"
