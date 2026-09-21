@@ -17,12 +17,25 @@ function extractPhoneNumbers(contact) {
     options.push({ label, value: trimmed })
   }
 
+  const workHqNumbers = new Set(
+    (contact.phone_numbers ?? [])
+      .filter((phone) => phone.type === "work_hq")
+      .map(
+        (phone) => phone.sanitized_number?.trim() || phone.raw_number?.trim()
+      )
+      .filter(Boolean)
+  )
+
   if (contact.sanitized_phone?.trim()) {
     const value = contact.sanitized_phone.trim()
-    addOption(value, `Primary · ${value}`)
+    if (!workHqNumbers.has(value)) {
+      addOption(value, `Primary · ${value}`)
+    }
   }
 
   for (const phone of contact.phone_numbers ?? []) {
+    if (phone.type === "work_hq") continue
+
     const value = phone.sanitized_number?.trim() || phone.raw_number?.trim()
     if (!value) continue
     const typeLabel = phone.type ? titleCase(phone.type) : "Other"
@@ -32,6 +45,37 @@ function extractPhoneNumbers(contact) {
   return options
 }
 
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "ymail.com",
+  "hotmail.com",
+  "outlook.com",
+  "live.com",
+  "msn.com",
+  "aol.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "protonmail.com",
+  "proton.me",
+  "gmx.com",
+  "gmx.net",
+  "zoho.com",
+  "mail.com",
+  "yandex.com",
+  "qq.com",
+  "163.com",
+  "126.com"
+])
+
+function isPublicDomainEmail(email) {
+  const domain = email.split("@")[1]?.toLowerCase()
+  return !!domain && PUBLIC_EMAIL_DOMAINS.has(domain)
+}
+
 function extractEmails(contact) {
   const seen = new Set()
   const options = []
@@ -39,6 +83,7 @@ function extractEmails(contact) {
   const addOption = (value, label) => {
     const trimmed = value?.trim()
     if (!trimmed || seen.has(trimmed)) return
+    if (isPublicDomainEmail(trimmed)) return
     seen.add(trimmed)
     options.push({ label, value: trimmed })
   }
@@ -51,7 +96,10 @@ function extractEmails(contact) {
   for (const entry of contact.contact_emails ?? []) {
     const value = entry.email?.trim()
     if (!value) continue
-    addOption(value, value === primary ? `Work · ${value}` : `Personal · ${value}`)
+    addOption(
+      value,
+      value === primary ? `Work · ${value}` : `Personal · ${value}`
+    )
   }
 
   return options
@@ -63,7 +111,10 @@ export function normalizeApolloContact(contact) {
   const phoneNumbers = extractPhoneNumbers(contact)
   const emails = extractEmails(contact)
 
-  const displayName = contact.name?.trim() || [firstName, lastName].filter(Boolean).join(" ") || "—"
+  const displayName =
+    contact.name?.trim() ||
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    "—"
 
   return {
     id: contact.id,
@@ -96,18 +147,24 @@ export function contactToZohoItem(
   const otherEmails = emails
     .map((entry) => entry.value)
     .filter(
-      (value) => value && value !== selected?.officialEmail && value !== selected?.personalEmail
+      (value) =>
+        value &&
+        value !== selected?.officialEmail &&
+        value !== selected?.personalEmail
     )
 
   const otherNumbers = phoneNumbers
     .map((entry) => entry.value)
-    .filter((value) => value && value !== selected?.mobile && value !== selected?.altNumber)
+    .filter(
+      (value) =>
+        value && value !== selected?.mobile && value !== selected?.altNumber
+    )
 
   const item = {
     First_Name: contact.firstName,
     Last_Name: contact.lastName,
     Lead_Source: "Apollo.io",
-    Lead_Status: "Not Contacted",
+    Lead_Status: "Untouched",
     Client_Campaign: campaign,
     Owner: {
       email: ownerEmail
@@ -115,7 +172,6 @@ export function contactToZohoItem(
   }
 
   if (selected?.officialEmail) item.Email = selected.officialEmail
-  if (selected?.personalEmail) item.Personal_Email = selected.personalEmail
   if (selected?.mobile) item.Mobile = selected.mobile
   if (selected?.altNumber) item.Alternate_Number = selected.altNumber
 
@@ -158,7 +214,9 @@ function classifyZohoItem(item) {
 
     return {
       status: "duplicate",
-      errors: [`Duplicate ${field} — matches existing record${existingId ? ` ${existingId}` : ""}`],
+      errors: [
+        `Duplicate ${field} — matches existing record${existingId ? ` ${existingId}` : ""}`
+      ],
       existingRecordId: existingId
     }
   }
@@ -185,7 +243,9 @@ export function mapZohoPushResults(rows, zohoResults) {
       errorCount++
       resolved.set(row.id, {
         status: "error",
-        errors: ["Zoho returned a mismatched result count — could not confirm this row's status"],
+        errors: [
+          "Zoho returned a mismatched result count — could not confirm this row's status"
+        ],
         checked: true
       })
     })

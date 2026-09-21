@@ -1,5 +1,13 @@
 import { useMemo } from "react"
-import { Anchor, Checkbox, Flex, Pagination, Select, Skeleton, Table } from "@mantine/core"
+import {
+  Anchor,
+  Checkbox,
+  Flex,
+  Pagination,
+  Select,
+  Skeleton,
+  Table
+} from "@mantine/core"
 
 const COLUMN_COUNT = 7
 const PER_PAGE_OPTIONS = ["15", "25", "50"]
@@ -22,7 +30,13 @@ function TableSkeleton({ rows = 5, columns = COLUMN_COUNT }) {
   )
 }
 
-function ContactFieldSelect({ options, value, onChange, emptyLabel, placeholder }) {
+function ContactFieldSelect({
+  options,
+  value,
+  onChange,
+  emptyLabel,
+  placeholder
+}) {
   if (options.length === 0) return emptyLabel
 
   return (
@@ -49,7 +63,12 @@ function HeaderCheckbox({ allSelected, someSelected, onToggleAll }) {
 }
 
 function RowCheckbox({ checked, onToggle }) {
-  return <Checkbox checked={checked} onChange={(e) => onToggle(e.currentTarget.checked)} />
+  return (
+    <Checkbox
+      checked={checked}
+      onChange={(e) => onToggle(e.currentTarget.checked)}
+    />
+  )
 }
 
 function TableFooter({
@@ -90,13 +109,15 @@ function TableFooter({
   )
 }
 
-function ContactRow({ contact, isSelected, onToggleSelected, details, onDetailChange }) {
+function ContactRow({
+  contact,
+  isSelected,
+  onToggleSelected,
+  details,
+  onDetailChange
+}) {
   const officialEmailOptions = useMemo(
     () => contact.emails.filter((e) => e.value !== details?.personalEmail),
-    [contact, details]
-  )
-  const personalEmailOptions = useMemo(
-    () => contact.emails.filter((e) => e.value !== details?.officialEmail),
     [contact, details]
   )
   const mobileOptions = useMemo(
@@ -111,7 +132,10 @@ function ContactRow({ contact, isSelected, onToggleSelected, details, onDetailCh
   return (
     <Table.Tr>
       <Table.Td>
-        <RowCheckbox checked={isSelected} onToggle={() => onToggleSelected(contact.id)} />
+        <RowCheckbox
+          checked={isSelected}
+          onToggle={() => onToggleSelected(contact.id)}
+        />
       </Table.Td>
 
       <Table.Td>{contact.displayName}</Table.Td>
@@ -120,17 +144,9 @@ function ContactRow({ contact, isSelected, onToggleSelected, details, onDetailCh
         <ContactFieldSelect
           options={officialEmailOptions}
           value={details?.officialEmail}
-          onChange={(value) => onDetailChange(contact.id, "officialEmail", value)}
-          emptyLabel="-"
-          placeholder="Choose an email"
-        />
-      </Table.Td>
-
-      <Table.Td>
-        <ContactFieldSelect
-          options={personalEmailOptions}
-          value={details?.personalEmail}
-          onChange={(value) => onDetailChange(contact.id, "personalEmail", value)}
+          onChange={(value) =>
+            onDetailChange(contact.id, "officialEmail", value)
+          }
           emptyLabel="-"
           placeholder="Choose an email"
         />
@@ -189,9 +205,14 @@ export default function LeadsTable({
   if (loading) return <TableSkeleton />
   if (contacts.length === 0) return null
 
-  const selectedOnPageCount = useMemo(() => contacts.filter((c) => c.checked).length, [contacts])
-  const allSelected = contacts.length > 0 && selectedOnPageCount === contacts.length
-  const someSelected = selectedOnPageCount > 0 && selectedOnPageCount < contacts.length
+  const selectedOnPageCount = useMemo(
+    () => contacts.filter((c) => c.checked).length,
+    [contacts]
+  )
+  const allSelected =
+    contacts.length > 0 && selectedOnPageCount === contacts.length
+  const someSelected =
+    selectedOnPageCount > 0 && selectedOnPageCount < contacts.length
 
   function toggleAll(checked) {
     setContacts((prev) => {
@@ -201,7 +222,9 @@ export default function LeadsTable({
 
   function toggleOne(id) {
     setContacts((prev) => {
-      return prev.map((c) => (c.id === id ? { ...c, checked: Boolean(!c.checked) } : c))
+      return prev.map((c) =>
+        c.id === id ? { ...c, checked: Boolean(!c.checked) } : c
+      )
     })
   }
 
@@ -226,7 +249,6 @@ export default function LeadsTable({
           </Table.Th>
           <Table.Th>Name</Table.Th>
           <Table.Th>Official Email</Table.Th>
-          <Table.Th>Personal Email</Table.Th>
           <Table.Th>Mobile</Table.Th>
           <Table.Th>Alt. Mobile</Table.Th>
           <Table.Th>Status</Table.Th>
